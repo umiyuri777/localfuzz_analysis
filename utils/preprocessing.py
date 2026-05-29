@@ -45,6 +45,7 @@ def build_bug_prediction_column_transformer(*, include_tree: bool = True) -> Col
                 "cat",
                 OneHotEncoder(
                     categories=[CPNUM_DIR_QUADRANT_CATEGORIES],
+                    drop="first",
                     handle_unknown="ignore",
                     sparse_output=False,
                 ),

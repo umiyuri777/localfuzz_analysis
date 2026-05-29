@@ -5,6 +5,7 @@ tree-different/task0, task1, task2 について、
 出力:
 - 各手法の評価結果（適合率・再現率・F値）
 - ロジスティック回帰以外の特徴量重要度
+- ロジスティック回帰式（標準化数値＋cpNum_dir の one-hot）
 """
 
 from __future__ import annotations
@@ -31,12 +32,19 @@ from utils.data_loader import (  # noqa: E402
 )
 from utils.decision_tree_analysis import build_decision_tree_pipeline  # noqa: E402
 from utils.gradient_boosting_analysis import build_gradient_boosting_pipeline  # noqa: E402
-from utils.logistic_regression_analysis import build_logistic_regression_pipeline  # noqa: E402
+from utils.logistic_regression_analysis import (  # noqa: E402
+    FittedLogisticCoefficients,
+    build_logistic_regression_pipeline,
+    fit_logistic_regression,
+)
 from utils.random_forest_analysis import build_random_forest_pipeline  # noqa: E402
 
 RANDOM_STATE = 42
 N_SPLITS = 10
 METRIC_DECIMALS = 4
+LOGISTIC_COEF_DECIMALS = 3
+LOGISTIC_INTERCEPT_DECIMALS = 3
+LOGISTIC_TERMS_ON_FIRST_LINE = 2
 
 METRIC_ROWS = [
     ("precision", "適合率"),
@@ -60,6 +68,8 @@ class TaskConfig:
     metrics_label: str
     importance_caption: str
     importance_label: str
+    logistic_equation_label: str
+    standardization_label: str
 
 
 TASK_CONFIGS: dict[str, TaskConfig] = {
@@ -71,6 +81,8 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         metrics_label="tab:all_single_metrics_prospect",
         importance_caption=r"各手法における特徴量重要度（\testfirst）",
         importance_label="tab:all_importance",
+        logistic_equation_label="eq:logistic_single_scaled",
+        standardization_label="eq:standardization_1",
     ),
     "task1": TaskConfig(
         task_id="task1",
@@ -80,6 +92,8 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         metrics_label="tab:all_single_metrics_prospect_task1",
         importance_caption=r"各手法における特徴量重要度（\testsecond）",
         importance_label="tab:all_importance_task1",
+        logistic_equation_label="eq:logistic_multi_scaled_prospect",
+        standardization_label="eq:standardization_task1",
     ),
     "task2": TaskConfig(
         task_id="task2",
@@ -89,6 +103,8 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
         metrics_label="tab:all_single_metrics_prospect_task2",
         importance_caption=r"各手法における特徴量重要度（\testthird）",
         importance_label="tab:all_importance_task2",
+        logistic_equation_label="eq:logistic_all_scaled_prospect",
+        standardization_label="eq:standardization_task2",
     ),
 }
 
@@ -110,24 +126,158 @@ def _format_value(value: float, decimals: int = METRIC_DECIMALS) -> str:
     return f"{value:.{decimals}f}"
 
 
-def latex_feature_name(name: str) -> str:
-    # ColumnTransformer が付与する接頭辞を外す（表示用）
+def _normalized_feature_name(name: str) -> str:
+    """ColumnTransformer が付与する接頭辞を外した特徴量名を返す。"""
     if name.startswith("num__"):
-        name = name[len("num__") :]
-    elif name.startswith("cat__"):
-        name = name[len("cat__") :]
+        return name[len("num__") :]
+    if name.startswith("cat__"):
+        return name[len("cat__") :]
+    return name
 
+
+def _is_cpnum_dir_feature(name: str) -> bool:
+    """cpNum_dir の one-hot 列か（重要度表には載せない）。"""
+    normalized = _normalized_feature_name(name)
+    return normalized == "cpNum_dir" or normalized.startswith("cpNum_dir_")
+
+
+def latex_feature_name(name: str) -> str:
+    name = _normalized_feature_name(name)
     latex_names = {
         "tree": r"tree",
         "cpNum": r"cpNum",
         "cpNum_range": r"cpNum\_range",
-        "cpNum_dir": r"cpNum\_dir",
     }
-    if name.startswith("cpNum_dir_"):
-        # 例: cpNum_dir_1 -> cpNum_dir=1
-        suffix = name.split("_", 2)[-1]
-        return rf"cpNum\_dir={suffix}"
     return latex_names.get(name, name.replace("_", r"\_"))
+
+
+def _transformed_feature_to_latex_term(feature_name: str) -> str:
+    """
+    ColumnTransformer 出力の特徴量名を LaTeX の説明変数表記に変換する。
+
+    - num__tree など → tree_{std}（標準化済み数値）
+    - cat__cpNum_dir_2 など → 名義ダミー \\mathbb{1}[\\mathrm{cpNum\\_dir}{=}2]
+    """
+    if feature_name.startswith("num__"):
+        base = feature_name[len("num__") :]
+        return rf"{latex_feature_name(base)}_{{std}}"
+    if feature_name.startswith("cat__"):
+        rest = feature_name[len("cat__") :]
+        if rest.startswith("cpNum_dir_"):
+            level = rest.split("_", 2)[-1]
+            return rf"\mathbb{{1}}[\mathrm{{cpNum\_dir}}{{=}}{level}]"
+        return rest.replace("_", r"\_")
+    return feature_name.replace("_", r"\_")
+
+
+def _format_latex_logistic_coef_term(
+    coef: float,
+    var_latex: str,
+    decimals: int = LOGISTIC_COEF_DECIMALS,
+) -> str:
+    sign = "+" if coef >= 0 else "-"
+    return rf"{sign} {abs(coef):.{decimals}f}\, {var_latex}"
+
+
+def _format_latex_mean(mean: float) -> str:
+    if abs(mean - round(mean, 1)) < 1e-9:
+        return f"{mean:.1f}"
+    return f"{mean:.2f}"
+
+
+def _format_latex_scale(scale: float) -> str:
+    if scale >= 10:
+        return f"{scale:.1f}"
+    return f"{scale:.2f}"
+
+
+def format_latex_logistic_scaled_equation(
+    coefficients: FittedLogisticCoefficients,
+    *,
+    label: str = "eq:logistic_single_scaled",
+    coef_decimals: int = LOGISTIC_COEF_DECIMALS,
+    intercept_decimals: int = LOGISTIC_INTERCEPT_DECIMALS,
+    terms_on_first_line: int = LOGISTIC_TERMS_ON_FIRST_LINE,
+) -> str:
+    """標準化数値＋cpNum_dir ダミーを用いたロジスティック回帰式を LaTeX で整形する。"""
+    terms = [
+        _format_latex_logistic_coef_term(
+            coef,
+            _transformed_feature_to_latex_term(name),
+            coef_decimals,
+        )
+        for coef, name in zip(coefficients.coefficients, coefficients.feature_names)
+    ]
+    z_first = (
+        f"{coefficients.intercept:.{intercept_decimals}f} "
+        + " ".join(terms[:terms_on_first_line])
+    )
+    remaining = terms[terms_on_first_line:]
+
+    lines = [
+        r"\begin{equation}",
+        f"\\label{{{label}}}",
+        r"\begin{aligned}",
+        r"  P &= \frac{1}{1 + \exp(-z)}, \\",
+        rf"  z &= {z_first} \\",
+    ]
+    for term in remaining:
+        lines.append(rf"    &\quad {term} \\")
+    lines[-1] = lines[-1].rstrip(" \\")
+
+    lines.extend([
+        r"\end{aligned}",
+        r"\end{equation}",
+    ])
+    return "\n".join(lines)
+
+
+def format_latex_standardization_equation(
+    coefficients: FittedLogisticCoefficients,
+    *,
+    label: str = "eq:standardization_1",
+) -> str:
+    """数値説明変数の標準化式（平均・標準偏差）を LaTeX で整形する。"""
+    stat_lines = []
+    for name, mean, scale in coefficients.numeric_standardization:
+        var = latex_feature_name(name)
+        stat_lines.append(
+            rf"  {var} &: \mu={_format_latex_mean(mean)},\ "
+            rf"\sigma \approx {_format_latex_scale(scale)}, \\"
+        )
+
+    ref = coefficients.reference_cpnum_dir
+
+    return "\n".join([
+        r"\begin{equation}",
+        f"\\label{{{label}}}",
+        r"\begin{aligned}",
+        r"  x_{std} &= \frac{x - \mu}{\sigma}, \\",
+        *stat_lines,
+        rf"  \mathrm{{cpNum\_dir}} &: \text{{象限 {ref} を基準カテゴリとする}} \\",
+        r"    &\quad \text{one-hot 符号化}",
+        r"\end{aligned}",
+        r"\end{equation}",
+    ])
+
+
+def format_latex_logistic_equations(
+    coefficients: FittedLogisticCoefficients,
+    *,
+    logistic_label: str = "eq:logistic_single_scaled",
+    standardization_label: str = "eq:standardization_1",
+) -> str:
+    """ロジスティック回帰式と標準化式の LaTeX を連結して返す。"""
+    return "\n\n".join([
+        format_latex_logistic_scaled_equation(
+            coefficients,
+            label=logistic_label,
+        ),
+        format_latex_standardization_equation(
+            coefficients,
+            label=standardization_label,
+        ),
+    ])
 
 
 def _bug_row_to_category(bug_row: list[str]) -> str:
@@ -274,6 +424,8 @@ def compute_feature_importance_stats(
     assert feature_names is not None
     assert importances is not None
     for idx, feature in enumerate(feature_names):
+        if _is_cpnum_dir_feature(feature):
+            continue
         fold_values = importances[:, idx]
         stats.append({
             "feature": feature,
@@ -368,7 +520,30 @@ def format_latex_all_importance_table(
     return "\n".join(lines)
 
 
-def evaluate_task(task_id: str, logs_root: Path, verbose: bool = False) -> tuple[str, str]:
+def build_logistic_latex(
+    X,
+    y,
+    config: TaskConfig,
+) -> str:
+    _, coefficients = fit_logistic_regression(
+        X,
+        y,
+        include_tree=True,
+        random_state=RANDOM_STATE,
+        model_step_name="lr",
+    )
+    return format_latex_logistic_equations(
+        coefficients,
+        logistic_label=config.logistic_equation_label,
+        standardization_label=config.standardization_label,
+    )
+
+
+def evaluate_task(
+    task_id: str,
+    logs_root: Path,
+    verbose: bool = False,
+) -> tuple[str, str, str]:
     config = TASK_CONFIGS[task_id]
     X, y = load_task_dataset(task_id, logs_root, verbose=verbose)
 
@@ -402,7 +577,8 @@ def evaluate_task(task_id: str, logs_root: Path, verbose: bool = False) -> tuple
         caption=config.importance_caption,
         label=config.importance_label,
     )
-    return metrics_table, importance_table
+    logistic_latex = build_logistic_latex(X, y, config)
+    return metrics_table, importance_table, logistic_latex
 
 
 def parse_args() -> argparse.Namespace:
@@ -449,7 +625,7 @@ def main() -> None:
         print(f"【{task_id}】{config.description}")
         print("=" * 88)
 
-        metrics_table, importance_table = evaluate_task(
+        metrics_table, importance_table, logistic_latex = evaluate_task(
             task_id,
             logs_root,
             verbose=args.verbose,
@@ -461,15 +637,21 @@ def main() -> None:
         print("\n【LaTeX形式：各手法の特徴量重要度】")
         print("-" * 88)
         print(importance_table)
+        print("\n【LaTeX形式：ロジスティック回帰式】")
+        print("-" * 88)
+        print(logistic_latex)
         print()
 
         if args.output_dir is not None:
             metrics_path = args.output_dir / f"{task_id}_metrics.tex"
             importance_path = args.output_dir / f"{task_id}_importance.tex"
+            logistic_path = args.output_dir / f"{task_id}_logistic.tex"
             metrics_path.write_text(metrics_table + "\n", encoding="utf-8")
             importance_path.write_text(importance_table + "\n", encoding="utf-8")
+            logistic_path.write_text(logistic_latex + "\n", encoding="utf-8")
             print(f"保存しました: {metrics_path}")
             print(f"保存しました: {importance_path}")
+            print(f"保存しました: {logistic_path}")
             print()
 
 

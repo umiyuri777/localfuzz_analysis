@@ -8,7 +8,10 @@
 - ロジスティック回帰曲線の描画
 """
 
-from typing import List, Optional, Union
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,12 +28,75 @@ from .metrics import (
     print_confusion_matrix,
 )
 from .preprocessing import (
+    CPNUM_DIR_QUADRANT_CATEGORIES,
     bug_prediction_feature_names,
     build_bug_prediction_column_transformer,
 )
 
-
 DEFAULT_FEATURE_NAMES = list(BUG_PREDICTION_FEATURE_NAMES)
+
+
+@dataclass(frozen=True)
+class FittedLogisticCoefficients:
+    """学習済みパイプラインから取り出したロジスティック回帰の係数（生の特徴量名）。"""
+
+    intercept: float
+    feature_names: list[str]
+    coefficients: list[float]
+    numeric_standardization: list[tuple[str, float, float]]
+    reference_cpnum_dir: int
+
+    @classmethod
+    def from_fitted_pipeline(
+        cls,
+        pipeline: Pipeline,
+        *,
+        reference_cpnum_dir: int = CPNUM_DIR_QUADRANT_CATEGORIES[0],
+    ) -> FittedLogisticCoefficients:
+        preprocess = pipeline.named_steps["preprocess"]
+        model_step = next(name for name in pipeline.named_steps if name != "preprocess")
+        model: LogisticRegression = pipeline.named_steps[model_step]
+        scaler: StandardScaler = preprocess.named_transformers_["num"]
+
+        feature_names = list(preprocess.get_feature_names_out())
+        numeric_standardization = [
+            (str(name), float(mean), float(scale))
+            for name, mean, scale in zip(
+                scaler.feature_names_in_,
+                scaler.mean_,
+                scaler.scale_,
+            )
+        ]
+
+        return cls(
+            intercept=float(model.intercept_[0]),
+            feature_names=feature_names,
+            coefficients=[float(c) for c in model.coef_[0]],
+            numeric_standardization=numeric_standardization,
+            reference_cpnum_dir=reference_cpnum_dir,
+        )
+
+
+def fit_logistic_regression(
+    X: Union[pd.DataFrame, np.ndarray],
+    y: Union[pd.Series, np.ndarray],
+    *,
+    include_tree: bool = True,
+    random_state: int = 42,
+    model_step_name: str = "model",
+    **logistic_kwargs,
+) -> Tuple[Pipeline, FittedLogisticCoefficients]:
+    """全データでロジスティック回帰パイプラインを学習し、係数情報を返す。"""
+    feature_names = bug_prediction_feature_names(include_tree=include_tree)
+    pipeline = build_logistic_regression_pipeline(
+        include_tree=include_tree,
+        model_step_name=model_step_name,
+        random_state=random_state,
+        **logistic_kwargs,
+    )
+    X_df = X[feature_names] if isinstance(X, pd.DataFrame) else X
+    pipeline.fit(X_df, y)
+    return pipeline, FittedLogisticCoefficients.from_fitted_pipeline(pipeline)
 
 
 class LogisticRegressionAnalyzer:
