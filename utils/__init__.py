@@ -7,6 +7,7 @@
 - 決定木: decision_tree_analysis
 - ランダムフォレスト: random_forest_analysis
 - 勾配ブースティング: gradient_boosting_analysis
+- 特徴量重要度: feature_importance
 """
 
 from .data_loader import (
@@ -16,6 +17,13 @@ from .data_loader import (
     parse_directory_name,
 )
 from .decision_tree_analysis import DecisionTreeAnalyzer, build_decision_tree_pipeline
+from .feature_importance import (
+    compute_feature_importance_stats_from_cv,
+    compute_feature_importance_stats_from_pipeline,
+    format_latex_all_importance_table,
+    format_latex_value,
+    latex_feature_name,
+)
 from .gradient_boosting_analysis import (
     GradientBoostingAnalyzer,
     build_gradient_boosting_pipeline,
@@ -57,4 +65,9 @@ __all__ = [
     "build_gradient_boosting_pipeline",
     "build_bug_prediction_column_transformer",
     "build_speedup_bug_column_transformer",
+    "compute_feature_importance_stats_from_cv",
+    "compute_feature_importance_stats_from_pipeline",
+    "format_latex_all_importance_table",
+    "format_latex_value",
+    "latex_feature_name",
 ]

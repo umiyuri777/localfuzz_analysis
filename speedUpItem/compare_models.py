@@ -15,6 +15,10 @@ if (project_root := Path(__file__).resolve().parent.parent) not in sys.path:
 
 from utils.data_loader import load_speedup_bug_dataset
 from utils.decision_tree_analysis import build_decision_tree_pipeline
+from utils.feature_importance import (
+    compute_feature_importance_stats_from_pipeline,
+    format_latex_all_importance_table,
+)
 from utils.gradient_boosting_analysis import build_gradient_boosting_pipeline
 from utils.logistic_regression_analysis import build_logistic_regression_pipeline
 from utils.metrics import calculate_binary_metrics
@@ -27,6 +31,23 @@ TARGET_LABELS = {
     "bug_detected_all": "5回全てバグ",
     "per_run": "1回の実行でバグ",
 }
+
+IMPORTANCE_LATEX_CONFIG = {
+    "bug_detected_any": {
+        "caption": r"各手法における特徴量重要度（speedUpItem / 5回中1回でもバグ）",
+        "label": "tab:speedup_importance_any",
+    },
+    "bug_detected_all": {
+        "caption": r"各手法における特徴量重要度（speedUpItem / 5回全てバグ）",
+        "label": "tab:speedup_importance_all",
+    },
+    "per_run": {
+        "caption": r"各手法における特徴量重要度（speedUpItem / 1回の実行でバグ）",
+        "label": "tab:speedup_importance_per_run",
+    },
+}
+
+LOGISTIC_MODEL_NAME = "ロジスティック回帰"
 
 # 各モデルのデフォルトハイパーパラメータ（target 指定で上書き可能）
 DEFAULT_MODEL_PARAMS = {
@@ -282,6 +303,7 @@ def main() -> None:
 
     models = _build_models(args.target)
     thresholds_for_target = THRESHOLDS_BY_TARGET.get(args.target, {})
+    model_importances: list[tuple[str, list[dict[str, float | str]]]] = []
 
     for name, model in models:
         model.fit(X_train, y_train)
@@ -293,6 +315,10 @@ def main() -> None:
             y_pred = model.predict(X_test)
         metrics = calculate_binary_metrics(y_test, y_pred, y_pred_proba=proba)
         results.append((name, metrics))
+
+        if name != LOGISTIC_MODEL_NAME:
+            importance_stats = compute_feature_importance_stats_from_pipeline(model)
+            model_importances.append((name, importance_stats))
 
     # 表形式で表示
     print("\n" + "=" * 88)
@@ -310,6 +336,17 @@ def main() -> None:
     print("\n【LaTeX形式の比較結果表】")
     print("-" * 88)
     print(format_latex_comparison_table(results, target_label))
+
+    importance_config = IMPORTANCE_LATEX_CONFIG[args.target]
+    importance_table = format_latex_all_importance_table(
+        model_importances,
+        caption=importance_config["caption"],
+        label=importance_config["label"],
+        decimals=METRIC_DECIMALS,
+    )
+    print("\n【LaTeX形式：各手法の特徴量重要度】")
+    print("-" * 88)
+    print(importance_table)
 
 
 if __name__ == "__main__":

@@ -37,6 +37,12 @@ from utils.logistic_regression_analysis import (  # noqa: E402
     build_logistic_regression_pipeline,
     fit_logistic_regression,
 )
+from utils.feature_importance import (  # noqa: E402
+    compute_feature_importance_stats_from_cv,
+    format_latex_all_importance_table,
+    format_latex_value,
+    latex_feature_name,
+)
 from utils.random_forest_analysis import build_random_forest_pipeline  # noqa: E402
 
 RANDOM_STATE = 42
@@ -121,34 +127,7 @@ def _default_logs_root() -> Path:
 
 
 def _format_value(value: float, decimals: int = METRIC_DECIMALS) -> str:
-    if value is None or np.isnan(value):
-        return "---"
-    return f"{value:.{decimals}f}"
-
-
-def _normalized_feature_name(name: str) -> str:
-    """ColumnTransformer が付与する接頭辞を外した特徴量名を返す。"""
-    if name.startswith("num__"):
-        return name[len("num__") :]
-    if name.startswith("cat__"):
-        return name[len("cat__") :]
-    return name
-
-
-def _is_cpnum_dir_feature(name: str) -> bool:
-    """cpNum_dir の one-hot 列か（重要度表には載せない）。"""
-    normalized = _normalized_feature_name(name)
-    return normalized == "cpNum_dir" or normalized.startswith("cpNum_dir_")
-
-
-def latex_feature_name(name: str) -> str:
-    name = _normalized_feature_name(name)
-    latex_names = {
-        "tree": r"tree",
-        "cpNum": r"cpNum",
-        "cpNum_range": r"cpNum\_range",
-    }
-    return latex_names.get(name, name.replace("_", r"\_"))
+    return format_latex_value(value, decimals)
 
 
 def _transformed_feature_to_latex_term(feature_name: str) -> str:
@@ -398,47 +377,6 @@ def summarize_scores(scores: np.ndarray) -> dict[str, float]:
     }
 
 
-def compute_feature_importance_stats(
-    cv_results,
-    step_name: str,
-) -> list[dict[str, float | str]]:
-    n_folds = len(cv_results["estimator"])
-    feature_names: list[str] | None = None
-    importances: np.ndarray | None = None
-
-    for fold_idx, estimator in enumerate(cv_results["estimator"]):
-        preprocess = estimator.named_steps["preprocess"]
-        fold_feature_names = list(preprocess.get_feature_names_out())
-        if feature_names is None:
-            feature_names = fold_feature_names
-            importances = np.zeros((n_folds, len(feature_names)))
-        else:
-            # 念のため（カテゴリ固定なので通常一致するはず）
-            if fold_feature_names != feature_names:
-                raise ValueError("前処理後の特徴量名がfold間で一致しません。")
-
-        model = estimator.named_steps[step_name]
-        importances[fold_idx] = model.feature_importances_
-
-    stats = []
-    assert feature_names is not None
-    assert importances is not None
-    for idx, feature in enumerate(feature_names):
-        if _is_cpnum_dir_feature(feature):
-            continue
-        fold_values = importances[:, idx]
-        stats.append({
-            "feature": feature,
-            "mean": float(np.mean(fold_values)),
-            "std": float(np.std(fold_values)),
-            "min": float(np.min(fold_values)),
-            "max": float(np.max(fold_values)),
-        })
-
-    stats.sort(key=lambda row: row["mean"], reverse=True)
-    return stats
-
-
 def format_latex_all_metrics_table(
     model_metrics: list[tuple[str, dict[str, dict[str, float]]]],
     caption: str,
@@ -471,46 +409,6 @@ def format_latex_all_metrics_table(
                 f" & {_format_value(summary['std'])}"
                 f" & {_format_value(summary['min'])}"
                 f" & {_format_value(summary['max'])}{suffix}"
-            )
-
-    lines.extend([
-        r"    \end{tabular}",
-        r"\end{table}",
-    ])
-    return "\n".join(lines)
-
-
-def format_latex_all_importance_table(
-    model_importances: list[tuple[str, list[dict[str, float | str]]]],
-    caption: str,
-    label: str,
-) -> str:
-    lines = [
-        r"\begin{table}[tb]",
-        f"    \\caption{{{caption}}}",
-        f"    \\label{{{label}}}",
-        r"    \centering",
-        r"    \begin{tabular}{llrrrr}",
-        r"        \hline",
-        r"        手法 & 特徴量 & 平均重要度 & 標準偏差 & 最小値 & 最大値 \\\hline \hline",
-    ]
-
-    for model_name, importance_rows in model_importances:
-        n_features = len(importance_rows)
-        for row_idx, row in enumerate(importance_rows):
-            if row_idx == 0:
-                method_cell = rf"\multirow{{{n_features}}}{{*}}{{{model_name}}}         "
-            else:
-                method_cell = " "
-
-            suffix = r" \\\hline" if row_idx == n_features - 1 else r" \\"
-            lines.append(
-                f"        {method_cell}"
-                f"& {latex_feature_name(str(row['feature']))} "
-                f"& {_format_value(float(row['mean']))}"
-                f" & {_format_value(float(row['std']))}"
-                f" & {_format_value(float(row['min']))}"
-                f" & {_format_value(float(row['max']))}{suffix}"
             )
 
     lines.extend([
@@ -561,7 +459,7 @@ def evaluate_task(
         model_metrics.append((model_name, metrics))
 
         if model_key != "logistic":
-            importance_stats = compute_feature_importance_stats(
+            importance_stats = compute_feature_importance_stats_from_cv(
                 cv_results,
                 step_name,
             )
