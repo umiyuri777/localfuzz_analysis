@@ -18,6 +18,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.pipeline import Pipeline
 
@@ -114,12 +115,16 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
     ),
 }
 
+BASELINE_MODEL_NAME = "BL"
+
 MODEL_SPECS: list[tuple[str, str, str]] = [
     ("logistic", "ロジスティック回帰", "lr"),
     ("tree", "決定木", "dt"),
     ("rf", "ランダムフォレスト", "rf"),
     ("gb", "勾配ブースティング", "gb"),
 ]
+
+BOX_PLOT_MODEL_ORDER = [BASELINE_MODEL_NAME, "LR", "DT", "RF", "GB"]
 
 
 def _default_logs_root() -> Path:
@@ -377,6 +382,117 @@ def summarize_scores(scores: np.ndarray) -> dict[str, float]:
     }
 
 
+def extract_fold_scores(cv_results: dict) -> dict[str, list[float]]:
+    """各評価指標の fold 別スコアを辞書で返す。"""
+    return {
+        metric_key: [float(v) for v in cv_results[f"test_{metric_key}"]]
+        for metric_key, _ in METRIC_ROWS
+    }
+
+
+def compute_baseline_fold_scores(X, y) -> dict[str, list[float]]:
+    """常にバグ発見と予測するベースラインの fold 別スコアを返す。"""
+    cv = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE)
+    y_array = np.asarray(y)
+    fold_scores = {metric_key: [] for metric_key, _ in METRIC_ROWS}
+
+    for _, test_idx in cv.split(X, y_array):
+        y_test = y_array[test_idx]
+        y_pred = np.ones(len(y_test), dtype=int)
+        fold_scores["precision"].append(
+            float(precision_score(y_test, y_pred, zero_division=0))
+        )
+        fold_scores["recall"].append(
+            float(recall_score(y_test, y_pred, zero_division=0))
+        )
+        fold_scores["f1"].append(
+            float(f1_score(y_test, y_pred, zero_division=0))
+        )
+
+    return fold_scores
+
+
+def _to_box_plot_model_name(model_name: str) -> str:
+    """plot_metrics_boxplot.py 用の短いモデル名に変換する。"""
+    mapping = {
+        "ロジスティック回帰": "LR",
+        "決定木": "DT",
+        "ランダムフォレスト": "RF",
+        "勾配ブースティング": "GB",
+        BASELINE_MODEL_NAME: BASELINE_MODEL_NAME,
+    }
+    return mapping.get(model_name, model_name)
+
+
+def build_box_plot_fold_scores(
+    fold_scores: dict[str, dict[str, list[float]]],
+) -> dict[str, dict[str, list[float]]]:
+    """plot_metrics_boxplot.py 用にモデル名を揃え、定義順に並べ替える。"""
+    renamed = {
+        _to_box_plot_model_name(model_name): scores
+        for model_name, scores in fold_scores.items()
+    }
+    return {
+        model_name: renamed[model_name]
+        for model_name in BOX_PLOT_MODEL_ORDER
+        if model_name in renamed
+    }
+
+
+def _format_python_float_list(values: list[float]) -> list[str]:
+    return [f"{value:.{METRIC_DECIMALS}f}" for value in values]
+
+
+def format_python_cv_fold_scores_entry(
+    model_scores: dict[str, dict[str, list[float]]],
+    *,
+    indent: int = 4,
+) -> list[str]:
+    """1 task 分の CV fold スコアを Python 辞書リテラル行として整形する。"""
+    pad = " " * indent
+    lines: list[str] = []
+
+    for model_idx, (model_name, metrics) in enumerate(model_scores.items()):
+        lines.append(f'{pad}"{model_name}": {{')
+        metric_items = list(metrics.items())
+        for metric_idx, (metric_key, scores) in enumerate(metric_items):
+            formatted_scores = ", ".join(_format_python_float_list(scores))
+            comma = "," if metric_idx < len(metric_items) - 1 else ""
+            lines.append(f'{pad}    "{metric_key}": [{formatted_scores}]{comma}')
+        model_comma = "," if model_idx < len(model_scores) - 1 else ""
+        lines.append(f"{pad}}}{model_comma}")
+
+    return lines
+
+
+def format_python_cv_fold_scores_block(
+    all_fold_scores: dict[str, dict[str, dict[str, list[float]]]],
+    *,
+    variable_name: str = "CV_FOLD_SCORES",
+) -> str:
+    """
+    plot_metrics_boxplot.py へ貼り付けやすい Python 辞書ブロックを生成する。
+
+    task0 / task1 / task2 を 1 つの dict にまとめた形式で出力する。
+    """
+    lines = [
+        "# " + "=" * 72,
+        f"# 貼り付け用: plot_metrics_boxplot.py の {variable_name} にコピー",
+        "# " + "=" * 72,
+        f"{variable_name}: dict[str, dict[str, dict[str, list[float]]]] = {{",
+    ]
+
+    task_items = list(all_fold_scores.items())
+    for task_idx, (task_id, model_scores) in enumerate(task_items):
+        lines.append(f'    "{task_id}": {{')
+        lines.extend(format_python_cv_fold_scores_entry(model_scores, indent=8))
+        task_comma = "," if task_idx < len(task_items) - 1 else ""
+        lines.append(f"    }}{task_comma}")
+
+    lines.append("}")
+    return "\n".join(lines)
+
+
 def format_latex_all_metrics_table(
     model_metrics: list[tuple[str, dict[str, dict[str, float]]]],
     caption: str,
@@ -441,12 +557,15 @@ def evaluate_task(
     task_id: str,
     logs_root: Path,
     verbose: bool = False,
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, dict[str, dict[str, list[float]]]]:
     config = TASK_CONFIGS[task_id]
     X, y = load_task_dataset(task_id, logs_root, verbose=verbose)
 
     model_metrics: list[tuple[str, dict[str, dict[str, float]]]] = []
     model_importances: list[tuple[str, list[dict[str, float | str]]]] = []
+    fold_scores: dict[str, dict[str, list[float]]] = {
+        BASELINE_MODEL_NAME: compute_baseline_fold_scores(X, y),
+    }
 
     for model_key, model_name, _ in MODEL_SPECS:
         pipeline, step_name = build_pipeline(model_key, task_id)
@@ -457,6 +576,7 @@ def evaluate_task(
             for metric_key, _ in METRIC_ROWS
         }
         model_metrics.append((model_name, metrics))
+        fold_scores[model_name] = extract_fold_scores(cv_results)
 
         if model_key != "logistic":
             importance_stats = compute_feature_importance_stats_from_cv(
@@ -477,7 +597,7 @@ def evaluate_task(
         label=config.importance_label,
     )
     logistic_latex = build_logistic_latex(X, y, config)
-    return metrics_table, importance_table, logistic_latex
+    return metrics_table, importance_table, logistic_latex, fold_scores
 
 
 def parse_args() -> argparse.Namespace:
@@ -518,17 +638,20 @@ def main() -> None:
     if args.output_dir is not None:
         args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    all_fold_scores: dict[str, dict[str, dict[str, list[float]]]] = {}
+
     for task_id in task_ids:
         config = TASK_CONFIGS[task_id]
         print("=" * 88)
         print(f"【{task_id}】{config.description}")
         print("=" * 88)
 
-        metrics_table, importance_table, logistic_latex = evaluate_task(
+        metrics_table, importance_table, logistic_latex, fold_scores = evaluate_task(
             task_id,
             logs_root,
             verbose=args.verbose,
         )
+        all_fold_scores[task_id] = build_box_plot_fold_scores(fold_scores)
 
         print("\n【LaTeX形式：各手法の評価結果】")
         print("-" * 88)
@@ -551,6 +674,22 @@ def main() -> None:
             print(f"保存しました: {metrics_path}")
             print(f"保存しました: {importance_path}")
             print(f"保存しました: {logistic_path}")
+            print()
+
+    if all_fold_scores:
+        print("=" * 88)
+        print("【貼り付け用：plot_metrics_boxplot.py の CV_FOLD_SCORES】")
+        print("=" * 88)
+        print(format_python_cv_fold_scores_block(all_fold_scores))
+        print()
+
+        if args.output_dir is not None:
+            boxplot_data_path = args.output_dir / "cv_fold_scores.py"
+            boxplot_data_path.write_text(
+                format_python_cv_fold_scores_block(all_fold_scores) + "\n",
+                encoding="utf-8",
+            )
+            print(f"保存しました: {boxplot_data_path}")
             print()
 
 
