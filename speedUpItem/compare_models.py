@@ -18,6 +18,7 @@ from utils.decision_tree_analysis import build_decision_tree_pipeline
 from utils.feature_importance import (
     compute_feature_importance_stats_from_pipeline,
     format_latex_all_importance_table,
+    normalized_feature_name,
 )
 from utils.gradient_boosting_analysis import build_gradient_boosting_pipeline
 from utils.logistic_regression_analysis import build_logistic_regression_pipeline
@@ -53,6 +54,8 @@ BASELINE_MODEL_NAME = "ベースライン（常にバグ発見）"
 TARGET_ORDER = ["per_run", "bug_detected_any", "bug_detected_all"]
 
 PLOT_MODEL_ORDER = ["BL", "LR", "DT", "RF", "GB"]
+IMPORTANCE_MODEL_ORDER = ["DT", "RF", "GB"]
+PLOT_FEATURE_ORDER = ["cpNum", "cpNum_range"]
 MODEL_NAME_TO_PLOT = {
     BASELINE_MODEL_NAME: "BL",
     "ロジスティック回帰": "LR",
@@ -281,6 +284,35 @@ def build_plot_metrics_scores(
     return plot_scores
 
 
+def build_plot_feature_importances(
+    importances_by_target: dict[str, list[tuple[str, list[dict[str, float | str]]]]],
+) -> dict[str, dict[str, dict[str, float]]]:
+    """plot_metrics_bar.py 用に target × モデル × 特徴量の平均重要度辞書を構築する。"""
+    plot_importances: dict[str, dict[str, dict[str, float]]] = {}
+    for target in TARGET_ORDER:
+        if target not in importances_by_target:
+            continue
+        renamed: dict[str, dict[str, float]] = {}
+        for model_name, importance_rows in importances_by_target[target]:
+            plot_name = MODEL_NAME_TO_PLOT.get(model_name)
+            if plot_name is None:
+                continue
+            renamed[plot_name] = {
+                normalized_feature_name(str(row["feature"])): float(row["mean"])
+                for row in importance_rows
+            }
+        plot_importances[target] = {
+            model_name: {
+                feature_name: renamed[model_name][feature_name]
+                for feature_name in PLOT_FEATURE_ORDER
+                if feature_name in renamed[model_name]
+            }
+            for model_name in IMPORTANCE_MODEL_ORDER
+            if model_name in renamed
+        }
+    return plot_importances
+
+
 def format_python_metrics_scores_block(
     metrics_scores: dict[str, dict[str, dict[str, float]]],
     *,
@@ -305,6 +337,44 @@ def format_python_metrics_scores_block(
                 comma = "," if metric_idx < len(metric_items) - 1 else ""
                 lines.append(
                     f'            "{metric_key}": {value:.{METRIC_DECIMALS}f}{comma}'
+                )
+            model_comma = "," if model_idx < len(model_items) - 1 else ""
+            lines.append(f"        }}{model_comma}")
+        target_comma = "," if target_idx < len(target_items) - 1 else ""
+        lines.append(f"    }}{target_comma}")
+
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def format_python_feature_importances_block(
+    feature_importances: dict[str, dict[str, dict[str, float]]],
+    *,
+    variable_name: str = "FEATURE_IMPORTANCES",
+) -> str:
+    """plot_metrics_bar.py の FEATURE_IMPORTANCES 定義ブロックをそのまま貼れる形式で返す。"""
+    lines = [
+        "# =============================================================================",
+        "# 貼り付け用データ（compare_models.py の出力をここにコピー）",
+        "# =============================================================================",
+        f"{variable_name}: dict[str, dict[str, dict[str, float]]] = {{",
+    ]
+
+    target_items = [
+        (target, feature_importances[target])
+        for target in TARGET_ORDER
+        if target in feature_importances
+    ]
+    for target_idx, (target, model_scores) in enumerate(target_items):
+        lines.append(f'    "{target}": {{')
+        model_items = list(model_scores.items())
+        for model_idx, (model_name, feature_scores) in enumerate(model_items):
+            lines.append(f'        "{model_name}": {{')
+            feature_items = list(feature_scores.items())
+            for feature_idx, (feature_name, value) in enumerate(feature_items):
+                comma = "," if feature_idx < len(feature_items) - 1 else ""
+                lines.append(
+                    f'            "{feature_name}": {value:.{METRIC_DECIMALS}f}{comma}'
                 )
             model_comma = "," if model_idx < len(model_items) - 1 else ""
             lines.append(f"        }}{model_comma}")
@@ -440,6 +510,7 @@ def main() -> None:
     targets = [args.target] if args.target else TARGET_ORDER
     run_all_targets = args.target is None
     results_by_target: dict[str, list[tuple[str, dict]]] = {}
+    importances_by_target: dict[str, list[tuple[str, list[dict[str, float | str]]]]] = {}
 
     for target in targets:
         print("\n" + "=" * 88)
@@ -461,6 +532,7 @@ def main() -> None:
         _print_target_report(target, results)
 
         model_importances = _collect_feature_importances(target)
+        importances_by_target[target] = model_importances
         importance_config = IMPORTANCE_LATEX_CONFIG[target]
         importance_table = format_latex_all_importance_table(
             model_importances,
@@ -475,11 +547,17 @@ def main() -> None:
     if run_all_targets:
         metrics_scores = build_plot_metrics_scores(results_by_target)
         metrics_block = format_python_metrics_scores_block(metrics_scores)
+        feature_importances = build_plot_feature_importances(importances_by_target)
+        feature_block = format_python_feature_importances_block(feature_importances)
 
         args.output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = args.output_dir / "metrics_scores.py"
-        output_path.write_text(metrics_block + "\n", encoding="utf-8")
-        print(f"\n保存しました: {output_path}")
+        metrics_output_path = args.output_dir / "metrics_scores.py"
+        metrics_output_path.write_text(metrics_block + "\n", encoding="utf-8")
+        print(f"\n保存しました: {metrics_output_path}")
+
+        feature_output_path = args.output_dir / "feature_importances.py"
+        feature_output_path.write_text(feature_block + "\n", encoding="utf-8")
+        print(f"保存しました: {feature_output_path}")
 
 
 if __name__ == "__main__":

@@ -75,6 +75,43 @@ def _build_importance_stats(
     return stats
 
 
+def extract_fold_importances_from_cv(
+    cv_results: dict[str, Any],
+    step_name: str,
+    *,
+    exclude_cpnum_dir: bool = True,
+) -> dict[str, list[float]]:
+    """交差検証結果から各特徴量の fold 別重要度を辞書で返す。"""
+    n_folds = len(cv_results["estimator"])
+    feature_names: list[str] | None = None
+    importances: np.ndarray | None = None
+
+    for fold_idx, estimator in enumerate(cv_results["estimator"]):
+        preprocess = estimator.named_steps["preprocess"]
+        fold_feature_names = list(preprocess.get_feature_names_out())
+        if feature_names is None:
+            feature_names = fold_feature_names
+            importances = np.zeros((n_folds, len(feature_names)))
+        elif fold_feature_names != feature_names:
+            raise ValueError("前処理後の特徴量名が fold 間で一致しません。")
+
+        model = estimator.named_steps[step_name]
+        assert importances is not None
+        importances[fold_idx] = model.feature_importances_
+
+    assert feature_names is not None
+    assert importances is not None
+
+    result: dict[str, list[float]] = {}
+    for idx, feature in enumerate(feature_names):
+        if exclude_cpnum_dir and is_cpnum_dir_feature(feature):
+            continue
+        normalized = normalized_feature_name(feature)
+        result[normalized] = [float(v) for v in importances[:, idx]]
+
+    return result
+
+
 def compute_feature_importance_stats_from_cv(
     cv_results: dict[str, Any],
     step_name: str,

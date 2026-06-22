@@ -1,11 +1,12 @@
 """
-task0 / task1 / task2 の適合率・再現率・F値を 1 枚の箱ひげ図に描画する。
+task0 / task1 / task2 の適合率・再現率・F値、および特徴量重要度を箱ひげ図で描画する。
 
 各 task のサブプロット内に、全アルゴリズムを横並びで表示する。
-各アルゴリズムのグループ内に適合率・再現率・F値の 3 箱を並べる。
+評価指標図では各アルゴリズムのグループ内に適合率・再現率・F値の 3 箱を並べる。
+特徴量重要度図では DT / RF / GB ごとに各特徴量の箱を並べる。
 
 使い方:
-1. export_latex_tables.py を実行し、出力された CV_FOLD_SCORES ブロックを下記に貼り付ける
+1. export_latex_tables.py を実行し、出力された CV_FOLD_SCORES / CV_FOLD_IMPORTANCES を貼り付ける
 2. ラベルなどの設定を必要に応じて変更する
 3. python plot_metrics_boxplot.py
 """
@@ -109,6 +110,90 @@ CV_FOLD_SCORES: dict[str, dict[str, dict[str, list[float]]]] = {
 }
 
 # =============================================================================
+# 貼り付け用データ（export_latex_tables.py の出力をここにコピー）
+# =============================================================================
+CV_FOLD_IMPORTANCES: dict[str, dict[str, dict[str, list[float]]]] = {
+    "task0": {
+        "DT": {
+            "tree": [0.0032, 0.0019, 0.0024, 0.0032, 0.0029, 0.0024, 0.0034, 0.0028, 0.0025, 0.0023],
+            "cpNum": [0.3067, 0.3122, 0.3072, 0.3166, 0.3090, 0.3054, 0.3042, 0.3069, 0.3057, 0.3086],
+            "cpNum_range": [0.6900, 0.6858, 0.6904, 0.6802, 0.6881, 0.6922, 0.6925, 0.6903, 0.6915, 0.6891],
+            "cpNum_dir_2": [0.0001, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+            "cpNum_dir_3": [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0003, 0.0000],
+            "cpNum_dir_4": [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000]
+        },
+        "RF": {
+            "tree": [0.0050, 0.0040, 0.0041, 0.0044, 0.0044, 0.0044, 0.0050, 0.0054, 0.0049, 0.0049],
+            "cpNum": [0.2481, 0.2446, 0.2453, 0.2498, 0.2396, 0.2570, 0.2488, 0.2495, 0.2444, 0.2576],
+            "cpNum_range": [0.7436, 0.7481, 0.7472, 0.7425, 0.7526, 0.7352, 0.7431, 0.7419, 0.7476, 0.7341],
+            "cpNum_dir_2": [0.0012, 0.0010, 0.0011, 0.0009, 0.0010, 0.0011, 0.0011, 0.0008, 0.0011, 0.0011],
+            "cpNum_dir_3": [0.0008, 0.0010, 0.0011, 0.0011, 0.0012, 0.0010, 0.0009, 0.0011, 0.0010, 0.0010],
+            "cpNum_dir_4": [0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0011, 0.0014, 0.0010, 0.0013]
+        },
+        "GB": {
+            "tree": [0.0066, 0.0061, 0.0052, 0.0055, 0.0060, 0.0060, 0.0071, 0.0075, 0.0062, 0.0061],
+            "cpNum": [0.3055, 0.3108, 0.3062, 0.3156, 0.3087, 0.3045, 0.3030, 0.3055, 0.3049, 0.3071],
+            "cpNum_range": [0.6856, 0.6802, 0.6854, 0.6763, 0.6830, 0.6873, 0.6871, 0.6845, 0.6858, 0.6843],
+            "cpNum_dir_2": [0.0008, 0.0004, 0.0007, 0.0008, 0.0006, 0.0006, 0.0004, 0.0005, 0.0006, 0.0009],
+            "cpNum_dir_3": [0.0003, 0.0008, 0.0005, 0.0006, 0.0006, 0.0004, 0.0012, 0.0008, 0.0014, 0.0005],
+            "cpNum_dir_4": [0.0011, 0.0015, 0.0020, 0.0012, 0.0011, 0.0012, 0.0011, 0.0012, 0.0011, 0.0010]
+        }
+    },
+    "task1": {
+        "DT": {
+            "tree": [0.0000, 0.0045, 0.0000, 0.0045, 0.0031, 0.0000, 0.0001, 0.0034, 0.0271, 0.0045],
+            "cpNum": [0.2248, 0.2487, 0.2301, 0.2313, 0.2198, 0.2100, 0.2272, 0.2268, 0.1911, 0.2068],
+            "cpNum_range": [0.7572, 0.7466, 0.7649, 0.7640, 0.7693, 0.7721, 0.7570, 0.7637, 0.7816, 0.7885],
+            "cpNum_dir_2": [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0001, 0.0000, 0.0000, 0.0000],
+            "cpNum_dir_3": [0.0028, 0.0000, 0.0000, 0.0000, 0.0000, 0.0035, 0.0054, 0.0000, 0.0000, 0.0000],
+            "cpNum_dir_4": [0.0152, 0.0002, 0.0049, 0.0002, 0.0078, 0.0144, 0.0102, 0.0060, 0.0002, 0.0002]
+        },
+        "RF": {
+            "tree": [0.0367, 0.0301, 0.0275, 0.0289, 0.0345, 0.0325, 0.0332, 0.0292, 0.0363, 0.0314],
+            "cpNum": [0.2257, 0.2503, 0.2385, 0.2339, 0.2317, 0.2109, 0.2371, 0.2497, 0.1980, 0.2283],
+            "cpNum_range": [0.7009, 0.6851, 0.6963, 0.7043, 0.6989, 0.7159, 0.6875, 0.6796, 0.7296, 0.7066],
+            "cpNum_dir_2": [0.0102, 0.0130, 0.0116, 0.0124, 0.0128, 0.0140, 0.0129, 0.0129, 0.0107, 0.0093],
+            "cpNum_dir_3": [0.0123, 0.0096, 0.0128, 0.0076, 0.0112, 0.0132, 0.0127, 0.0128, 0.0114, 0.0122],
+            "cpNum_dir_4": [0.0142, 0.0118, 0.0132, 0.0129, 0.0109, 0.0134, 0.0165, 0.0159, 0.0140, 0.0122]
+        },
+        "GB": {
+            "tree": [0.0507, 0.0410, 0.0491, 0.0417, 0.0588, 0.0534, 0.0545, 0.0512, 0.0569, 0.0508],
+            "cpNum": [0.2250, 0.2458, 0.2255, 0.2299, 0.2200, 0.2085, 0.2410, 0.2213, 0.1942, 0.2107],
+            "cpNum_range": [0.6801, 0.6869, 0.6927, 0.7027, 0.6855, 0.7045, 0.6712, 0.6867, 0.7199, 0.7089],
+            "cpNum_dir_2": [0.0065, 0.0067, 0.0123, 0.0137, 0.0126, 0.0139, 0.0064, 0.0091, 0.0082, 0.0096],
+            "cpNum_dir_3": [0.0181, 0.0081, 0.0123, 0.0028, 0.0099, 0.0059, 0.0141, 0.0162, 0.0062, 0.0123],
+            "cpNum_dir_4": [0.0195, 0.0115, 0.0082, 0.0092, 0.0132, 0.0138, 0.0128, 0.0156, 0.0146, 0.0077]
+        }
+    },
+    "task2": {
+        "DT": {
+            "tree": [0.0213, 0.0184, 0.0203, 0.0302, 0.0209, 0.0232, 0.0168, 0.0195, 0.0207, 0.0212],
+            "cpNum": [0.3653, 0.3497, 0.3591, 0.3642, 0.3572, 0.3686, 0.3546, 0.3495, 0.3526, 0.3603],
+            "cpNum_range": [0.6135, 0.6319, 0.6206, 0.6056, 0.6219, 0.6067, 0.6286, 0.6310, 0.6267, 0.6184],
+            "cpNum_dir_2": [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0014, 0.0000, 0.0000, 0.0000, 0.0000],
+            "cpNum_dir_3": [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+            "cpNum_dir_4": [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000]
+        },
+        "RF": {
+            "tree": [0.0257, 0.0220, 0.0242, 0.0295, 0.0247, 0.0238, 0.0240, 0.0255, 0.0256, 0.0230],
+            "cpNum": [0.2950, 0.2873, 0.2878, 0.3086, 0.2910, 0.2972, 0.2912, 0.2896, 0.2864, 0.2950],
+            "cpNum_range": [0.6616, 0.6749, 0.6709, 0.6443, 0.6627, 0.6609, 0.6638, 0.6666, 0.6702, 0.6655],
+            "cpNum_dir_2": [0.0045, 0.0050, 0.0044, 0.0045, 0.0063, 0.0050, 0.0055, 0.0058, 0.0042, 0.0047],
+            "cpNum_dir_3": [0.0047, 0.0044, 0.0048, 0.0056, 0.0052, 0.0044, 0.0062, 0.0044, 0.0050, 0.0043],
+            "cpNum_dir_4": [0.0085, 0.0064, 0.0078, 0.0074, 0.0101, 0.0087, 0.0093, 0.0082, 0.0087, 0.0075]
+        },
+        "GB": {
+            "tree": [0.0275, 0.0209, 0.0237, 0.0317, 0.0235, 0.0254, 0.0211, 0.0213, 0.0240, 0.0248],
+            "cpNum": [0.3583, 0.3481, 0.3541, 0.3608, 0.3504, 0.3639, 0.3470, 0.3468, 0.3454, 0.3547],
+            "cpNum_range": [0.6030, 0.6223, 0.6126, 0.5934, 0.6132, 0.6004, 0.6146, 0.6213, 0.6181, 0.6102],
+            "cpNum_dir_2": [0.0010, 0.0018, 0.0014, 0.0024, 0.0021, 0.0014, 0.0016, 0.0026, 0.0018, 0.0011],
+            "cpNum_dir_3": [0.0025, 0.0017, 0.0007, 0.0016, 0.0005, 0.0005, 0.0019, 0.0006, 0.0009, 0.0008],
+            "cpNum_dir_4": [0.0079, 0.0052, 0.0075, 0.0103, 0.0104, 0.0084, 0.0139, 0.0074, 0.0098, 0.0084]
+        }
+    }
+}
+
+# =============================================================================
 # 描画設定（文言はここで変更）
 # =============================================================================
 MODEL_ORDER = ["BL", "LR", "DT", "RF", "GB"]
@@ -136,23 +221,71 @@ METRIC_LABELS = {
 
 FIGURE_TITLE = "各モデルの評価結果(モデル構築プロセス)"
 YLABEL = "スコア"
-YLIM = (0.0, 1.02)  # 1.0 ちょうどの箱ひげが上端で見えなくなるのを防ぐ
+YLIM = (0.3, 1.02)  # 1.0 ちょうどの箱ひげが上端で見えなくなるのを防ぐ
 
 FIGURE_SIZE = (15, 5)
-METRIC_COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1"]
-BOX_ALPHA = 0.7
+# 白黒印刷向けグレースケール（明→暗）
+METRIC_COLORS = ["#C8C8C8", "#909090", "#585858"]
+BOX_ALPHA = 0.85
+BOX_EDGE_COLOR = "black"
 GROUP_GAP = 0.4
 METRIC_SPACING = 0.3
 BOX_WIDTH = 0.2
 BOX_LABEL_FONTSIZE = 8
-BOX_LABEL_ROTATION = 45
+BOX_LABEL_ROTATION = 90
 BOX_LABEL_Y = -0.02
 MODEL_LABEL_FONTSIZE = 15
 MODEL_LABEL_Y = -0.15
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "figures"
 OUTPUT_BASENAME = "metrics_model"
+IMPORTANCE_OUTPUT_BASENAME = "importance_model"
 OUTPUT_FORMATS = ("png",)  # 日本語ラベル利用時は pdf はフォント設定が必要
+
+IMPORTANCE_MODEL_ORDER = ["DT", "RF", "GB"]
+IMPORTANCE_MODEL_LABELS = {
+    "DT": "DT",
+    "RF": "RF",
+    "GB": "GB",
+}
+
+FEATURE_ORDER = [
+    "tree",
+    "cpNum",
+    "cpNum_range",
+    "cpNum_dir_2",
+    "cpNum_dir_3",
+    "cpNum_dir_4",
+]
+FEATURE_LABELS = {
+    "tree": "tree",
+    "cpNum": "C",
+    "cpNum_range": "D",
+    "cpNum_dir_2": "E=2",
+    "cpNum_dir_3": "E=3",
+    "cpNum_dir_4": "E=4",
+}
+
+IMPORTANCE_FIGURE_TITLE = "各モデルの特徴量重要度(モデル構築プロセス)"
+IMPORTANCE_YLABEL = "重要度"
+IMPORTANCE_YLIM = (0.0, 1.02)
+IMPORTANCE_FIGURE_SIZE = (12, 5)
+FEATURE_COLORS = [
+    "#D8D8D8",
+    "#B8B8B8",
+    "#989898",
+    "#787878",
+    "#585858",
+    "#383838",
+]
+IMPORTANCE_GROUP_GAP = 0.5
+IMPORTANCE_FEATURE_SPACING = 0.22
+IMPORTANCE_BOX_WIDTH = 0.16
+IMPORTANCE_BOX_LABEL_FONTSIZE = 7
+IMPORTANCE_BOX_LABEL_ROTATION = 90
+IMPORTANCE_BOX_LABEL_Y = -0.02
+IMPORTANCE_MODEL_LABEL_FONTSIZE = 15
+IMPORTANCE_MODEL_LABEL_Y = -0.18
 
 JAPANESE_FONTS = [
     "Hiragino Sans",
@@ -197,8 +330,40 @@ def _validate_scores(
                     )
 
 
+def _validate_importances(
+    cv_fold_importances: dict[str, dict[str, dict[str, list[float]]]],
+) -> None:
+    missing_tasks = [
+        task_id for task_id in TASK_ORDER if task_id not in cv_fold_importances
+    ]
+    if missing_tasks:
+        raise ValueError(f"CV_FOLD_IMPORTANCES に task が不足しています: {missing_tasks}")
+
+    for task_id in TASK_ORDER:
+        task_importances = cv_fold_importances[task_id]
+        for model_name in IMPORTANCE_MODEL_ORDER:
+            if model_name not in task_importances:
+                available = ", ".join(sorted(task_importances))
+                raise ValueError(
+                    f"{task_id} にモデル '{model_name}' がありません。"
+                    f" 利用可能: {available}"
+                )
+            for feature_name in FEATURE_ORDER:
+                if feature_name not in task_importances[model_name]:
+                    raise ValueError(
+                        f"{task_id} / {model_name} に特徴量 '{feature_name}' がありません"
+                    )
+
+
 def _build_grouped_boxplot_data(
     task_scores: dict[str, dict[str, list[float]]],
+    *,
+    model_order: list[str],
+    model_labels: dict[str, str],
+    item_order: list[str],
+    item_colors: list[str],
+    group_gap: float,
+    item_spacing: float,
 ) -> tuple[
     list[list[float]],
     list[float],
@@ -208,27 +373,95 @@ def _build_grouped_boxplot_data(
     list[str],
 ]:
     """1 task 分のグループ化箱ひげ図用データを生成する。"""
-    n_metrics = len(METRIC_ORDER)
-    group_stride = (n_metrics - 1) * METRIC_SPACING + GROUP_GAP + METRIC_SPACING
+    n_items = len(item_order)
+    group_stride = (n_items - 1) * item_spacing + group_gap + item_spacing
 
     box_data: list[list[float]] = []
     positions: list[float] = []
     box_colors: list[str] = []
-    box_metric_keys: list[str] = []
+    box_item_keys: list[str] = []
     group_centers: list[float] = []
 
-    for group_idx, model_name in enumerate(MODEL_ORDER):
+    for group_idx, model_name in enumerate(model_order):
         group_start = group_idx * group_stride
-        group_centers.append(group_start + (n_metrics - 1) * METRIC_SPACING / 2)
+        group_centers.append(group_start + (n_items - 1) * item_spacing / 2)
 
-        for metric_idx, metric_key in enumerate(METRIC_ORDER):
-            positions.append(group_start + metric_idx * METRIC_SPACING)
-            box_data.append(task_scores[model_name][metric_key])
-            box_colors.append(METRIC_COLORS[metric_idx])
-            box_metric_keys.append(metric_key)
+        for item_idx, item_key in enumerate(item_order):
+            positions.append(group_start + item_idx * item_spacing)
+            box_data.append(task_scores[model_name][item_key])
+            box_colors.append(item_colors[item_idx % len(item_colors)])
+            box_item_keys.append(item_key)
 
-    tick_labels = [MODEL_LABELS.get(model, model) for model in MODEL_ORDER]
-    return box_data, positions, box_colors, group_centers, tick_labels, box_metric_keys
+    tick_labels = [model_labels.get(model, model) for model in model_order]
+    return box_data, positions, box_colors, group_centers, tick_labels, box_item_keys
+
+
+def _build_metrics_boxplot_data(
+    task_scores: dict[str, dict[str, list[float]]],
+) -> tuple[
+    list[list[float]],
+    list[float],
+    list[str],
+    list[float],
+    list[str],
+    list[str],
+]:
+    return _build_grouped_boxplot_data(
+        task_scores,
+        model_order=MODEL_ORDER,
+        model_labels=MODEL_LABELS,
+        item_order=METRIC_ORDER,
+        item_colors=METRIC_COLORS,
+        group_gap=GROUP_GAP,
+        item_spacing=METRIC_SPACING,
+    )
+
+
+def _build_importance_boxplot_data(
+    task_importances: dict[str, dict[str, list[float]]],
+) -> tuple[
+    list[list[float]],
+    list[float],
+    list[str],
+    list[float],
+    list[str],
+    list[str],
+]:
+    return _build_grouped_boxplot_data(
+        task_importances,
+        model_order=IMPORTANCE_MODEL_ORDER,
+        model_labels=IMPORTANCE_MODEL_LABELS,
+        item_order=FEATURE_ORDER,
+        item_colors=FEATURE_COLORS,
+        group_gap=IMPORTANCE_GROUP_GAP,
+        item_spacing=IMPORTANCE_FEATURE_SPACING,
+    )
+
+
+def _add_box_item_labels(
+    ax: plt.Axes,
+    positions: list[float],
+    item_keys: list[str],
+    item_labels: dict[str, str],
+    *,
+    fontsize: int,
+    rotation: int,
+    label_y: float,
+) -> None:
+    """各箱ひげ図の直下に項目ラベルを付ける（白黒印刷でも区別可能にする）。"""
+    label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+    for pos, item_key in zip(positions, item_keys):
+        ax.text(
+            pos,
+            label_y,
+            item_labels[item_key],
+            ha="right",
+            va="top",
+            rotation=rotation,
+            rotation_mode="anchor",
+            fontsize=fontsize,
+            transform=label_transform,
+        )
 
 
 def _add_box_metric_labels(
@@ -236,37 +469,51 @@ def _add_box_metric_labels(
     positions: list[float],
     metric_keys: list[str],
 ) -> None:
-    """各箱ひげ図の直下に指標ラベルを付ける（白黒印刷でも区別可能にする）。"""
-    label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-    for pos, metric_key in zip(positions, metric_keys):
-        ax.text(
-            pos,
-            BOX_LABEL_Y,
-            METRIC_LABELS[metric_key],
-            ha="right",
-            va="top",
-            rotation=BOX_LABEL_ROTATION,
-            rotation_mode="anchor",
-            fontsize=BOX_LABEL_FONTSIZE,
-            transform=label_transform,
-        )
+    _add_box_item_labels(
+        ax,
+        positions,
+        metric_keys,
+        METRIC_LABELS,
+        fontsize=BOX_LABEL_FONTSIZE,
+        rotation=BOX_LABEL_ROTATION,
+        label_y=BOX_LABEL_Y,
+    )
+
+
+def _add_feature_labels(
+    ax: plt.Axes,
+    positions: list[float],
+    feature_keys: list[str],
+) -> None:
+    _add_box_item_labels(
+        ax,
+        positions,
+        feature_keys,
+        FEATURE_LABELS,
+        fontsize=IMPORTANCE_BOX_LABEL_FONTSIZE,
+        rotation=IMPORTANCE_BOX_LABEL_ROTATION,
+        label_y=IMPORTANCE_BOX_LABEL_Y,
+    )
 
 
 def _add_model_labels(
     ax: plt.Axes,
     group_centers: list[float],
     model_labels: list[str],
+    *,
+    fontsize: int,
+    label_y: float,
 ) -> None:
-    """アルゴリズム名を指標ラベルの下に表示する。"""
+    """アルゴリズム名を項目ラベルの下に表示する。"""
     label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
     for pos, label in zip(group_centers, model_labels):
         ax.text(
             pos,
-            MODEL_LABEL_Y,
+            label_y,
             label,
             ha="center",
             va="top",
-            fontsize=MODEL_LABEL_FONTSIZE,
+            fontsize=fontsize,
             transform=label_transform,
         )
 
@@ -287,7 +534,7 @@ def plot_metrics_boxplot(
 
     for ax, task_id in zip(axes, TASK_ORDER):
         box_data, positions, box_colors, group_centers, tick_labels, box_metric_keys = (
-            _build_grouped_boxplot_data(cv_fold_scores[task_id])
+            _build_metrics_boxplot_data(cv_fold_scores[task_id])
         )
 
         bp = ax.boxplot(
@@ -299,11 +546,21 @@ def plot_metrics_boxplot(
         )
         for patch, color in zip(bp["boxes"], box_colors):
             patch.set_facecolor(color)
+            patch.set_edgecolor(BOX_EDGE_COLOR)
             patch.set_alpha(BOX_ALPHA)
+        for element in ("whiskers", "caps", "medians"):
+            for line in bp[element]:
+                line.set_color(BOX_EDGE_COLOR)
 
         ax.set_xticks([])
         _add_box_metric_labels(ax, positions, box_metric_keys)
-        _add_model_labels(ax, group_centers, tick_labels)
+        _add_model_labels(
+            ax,
+            group_centers,
+            tick_labels,
+            fontsize=MODEL_LABEL_FONTSIZE,
+            label_y=MODEL_LABEL_Y,
+        )
         task_label = TASK_LABELS.get(task_id, task_id)
         ax.set_title(task_label, fontsize=12, fontweight="bold")
         ax.set_ylim(*YLIM)
@@ -329,9 +586,82 @@ def plot_metrics_boxplot(
     return saved_paths[0]
 
 
+def plot_importance_boxplot(
+    cv_fold_importances: dict[str, dict[str, dict[str, list[float]]]],
+    *,
+    output_dir: Path = OUTPUT_DIR,
+    show: bool = False,
+) -> Path:
+    """DT / RF / GB の特徴量重要度を各 task サブプロット内に横並びで描画する。"""
+    _validate_importances(cv_fold_importances)
+
+    configure_matplotlib()
+    fig, axes = plt.subplots(
+        1,
+        len(TASK_ORDER),
+        figsize=IMPORTANCE_FIGURE_SIZE,
+        sharey=True,
+    )
+    if len(TASK_ORDER) == 1:
+        axes = [axes]
+
+    for ax, task_id in zip(axes, TASK_ORDER):
+        box_data, positions, box_colors, group_centers, tick_labels, box_feature_keys = (
+            _build_importance_boxplot_data(cv_fold_importances[task_id])
+        )
+
+        bp = ax.boxplot(
+            box_data,
+            positions=positions,
+            widths=IMPORTANCE_BOX_WIDTH,
+            patch_artist=True,
+            manage_ticks=False,
+        )
+        for patch, color in zip(bp["boxes"], box_colors):
+            patch.set_facecolor(color)
+            patch.set_edgecolor(BOX_EDGE_COLOR)
+            patch.set_alpha(BOX_ALPHA)
+        for element in ("whiskers", "caps", "medians"):
+            for line in bp[element]:
+                line.set_color(BOX_EDGE_COLOR)
+
+        ax.set_xticks([])
+        _add_feature_labels(ax, positions, box_feature_keys)
+        _add_model_labels(
+            ax,
+            group_centers,
+            tick_labels,
+            fontsize=IMPORTANCE_MODEL_LABEL_FONTSIZE,
+            label_y=IMPORTANCE_MODEL_LABEL_Y,
+        )
+        task_label = TASK_LABELS.get(task_id, task_id)
+        ax.set_title(task_label, fontsize=12, fontweight="bold")
+        ax.set_ylim(*IMPORTANCE_YLIM)
+        ax.grid(True, alpha=0.3, axis="y")
+
+    axes[0].set_ylabel(IMPORTANCE_YLABEL, fontsize=12)
+    fig.suptitle(IMPORTANCE_FIGURE_TITLE, fontsize=14, fontweight="bold")
+
+    fig.tight_layout()
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths: list[Path] = []
+    for fmt in OUTPUT_FORMATS:
+        output_path = output_dir / f"{IMPORTANCE_OUTPUT_BASENAME}.{fmt}"
+        fig.savefig(output_path, dpi=300, bbox_inches="tight")
+        saved_paths.append(output_path)
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    return saved_paths[0]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="task0〜task2 の全アルゴリズム評価指標を箱ひげ図で描画する",
+        description="task0〜task2 の評価指標と特徴量重要度を箱ひげ図で描画する",
     )
     parser.add_argument(
         "--output-dir",
@@ -349,18 +679,27 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if not CV_FOLD_SCORES:
+    if not CV_FOLD_SCORES and not CV_FOLD_IMPORTANCES:
         raise SystemExit(
-            "CV_FOLD_SCORES が空です。"
+            "CV_FOLD_SCORES と CV_FOLD_IMPORTANCES がどちらも空です。"
             " export_latex_tables.py の出力を貼り付けてから実行してください。"
         )
 
-    output_path = plot_metrics_boxplot(
-        CV_FOLD_SCORES,
-        output_dir=args.output_dir,
-        show=args.show,
-    )
-    print(f"保存しました: {output_path}")
+    if CV_FOLD_SCORES:
+        output_path = plot_metrics_boxplot(
+            CV_FOLD_SCORES,
+            output_dir=args.output_dir,
+            show=args.show,
+        )
+        print(f"保存しました: {output_path}")
+
+    if CV_FOLD_IMPORTANCES:
+        output_path = plot_importance_boxplot(
+            CV_FOLD_IMPORTANCES,
+            output_dir=args.output_dir,
+            show=args.show,
+        )
+        print(f"保存しました: {output_path}")
 
 
 if __name__ == "__main__":

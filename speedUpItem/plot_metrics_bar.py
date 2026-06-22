@@ -1,12 +1,12 @@
 """
-per_run / bug_detected_any / bug_detected_all の適合率・再現率・F値を
-1 枚の棒グラフに描画する。
+per_run / bug_detected_any / bug_detected_all の適合率・再現率・F値と
+特徴量重要度を 1 枚の棒グラフに描画する。
 
 train=tree=500, test=Logs の hold-out 評価結果を可視化する。
 交差検証を行っていないため、箱ひげ図ではなくグループ化棒グラフを使う。
 
 使い方:
-1. compare_models.py を実行し、末尾の METRICS_SCORES ブロックを下記に貼り付ける
+1. compare_models.py を実行し、末尾の METRICS_SCORES / FEATURE_IMPORTANCES ブロックを下記に貼り付ける
 2. ラベルなどの設定を必要に応じて変更する
 3. python plot_metrics_bar.py
 """
@@ -25,86 +25,132 @@ import matplotlib.transforms as mtransforms
 METRICS_SCORES: dict[str, dict[str, dict[str, float]]] = {
     "per_run": {
         "BL": {
-            "precision": 0.72,
-            "recall": 1.00,
-            "f1": 0.84
+            "precision": 0.7200,
+            "recall": 1.0000,
+            "f1": 0.8372
         },
         "LR": {
-            "precision": 0.81,
-            "recall": 0.80,
-            "f1": 0.81
+            "precision": 0.8113,
+            "recall": 0.8000,
+            "f1": 0.8056
         },
         "DT": {
-            "precision": 0.85,
-            "recall": 0.81,
-            "f1": 0.83
+            "precision": 0.8464,
+            "recall": 0.8111,
+            "f1": 0.8284
         },
         "RF": {
-            "precision": 0.85,
-            "recall": 0.81,
-            "f1": 0.83
+            "precision": 0.8464,
+            "recall": 0.8111,
+            "f1": 0.8284
         },
         "GB": {
-            "precision": 0.85,
-            "recall": 0.81,
-            "f1": 0.83
+            "precision": 0.8464,
+            "recall": 0.8111,
+            "f1": 0.8284
         }
     },
     "bug_detected_any": {
         "BL": {
-            "precision": 0.94,
-            "recall": 1.00,
-            "f1": 0.97
+            "precision": 0.9400,
+            "recall": 1.0000,
+            "f1": 0.9691
         },
         "LR": {
-            "precision": 0.94,
-            "recall": 1.00,
-            "f1": 0.97
+            "precision": 0.9400,
+            "recall": 1.0000,
+            "f1": 0.9691
         },
         "DT": {
-            "precision": 0.94,
-            "recall": 1.00,
-            "f1": 0.97
+            "precision": 0.9400,
+            "recall": 1.0000,
+            "f1": 0.9691
         },
         "RF": {
-            "precision": 0.94,
-            "recall": 1.00,
-            "f1": 0.97
+            "precision": 0.9400,
+            "recall": 1.0000,
+            "f1": 0.9691
         },
         "GB": {
-            "precision": 0.94,
-            "recall": 0.99,
-            "f1": 0.96
+            "precision": 0.9394,
+            "recall": 0.9894,
+            "f1": 0.9637
         }
     },
     "bug_detected_all": {
         "BL": {
-            "precision": 0.42,
-            "recall": 1.00,
-            "f1": 0.59
+            "precision": 0.4200,
+            "recall": 1.0000,
+            "f1": 0.5915
         },
         "LR": {
-            "precision": 0.67,
-            "recall": 0.57,
-            "f1": 0.62
+            "precision": 0.6667,
+            "recall": 0.5714,
+            "f1": 0.6154
         },
         "DT": {
-            "precision": 0.56,
-            "recall": 0.83,
-            "f1": 0.67
+            "precision": 0.5645,
+            "recall": 0.8333,
+            "f1": 0.6731
         },
         "RF": {
-            "precision": 0.54,
-            "recall": 0.81,
-            "f1": 0.65
+            "precision": 0.5397,
+            "recall": 0.8095,
+            "f1": 0.6476
         },
         "GB": {
-            "precision": 0.54,
-            "recall": 0.81,
-            "f1": 0.65
+            "precision": 0.5397,
+            "recall": 0.8095,
+            "f1": 0.6476
         }
     }
 }
+
+FEATURE_IMPORTANCES: dict[str, dict[str, dict[str, float]]] = {
+    "per_run": {
+        "DT": {
+            "cpNum": 0.3351,
+            "cpNum_range": 0.6642
+        },
+        "RF": {
+            "cpNum": 0.2805,
+            "cpNum_range": 0.7127
+        },
+        "GB": {
+            "cpNum": 0.3342,
+            "cpNum_range": 0.6589
+        }
+    },
+    "bug_detected_any": {
+        "DT": {
+            "cpNum": 0.2634,
+            "cpNum_range": 0.7183
+        },
+        "RF": {
+            "cpNum": 0.3049,
+            "cpNum_range": 0.6197
+        },
+        "GB": {
+            "cpNum": 0.2837,
+            "cpNum_range": 0.6622
+        }
+    },
+    "bug_detected_all": {
+        "DT": {
+            "cpNum": 0.3702,
+            "cpNum_range": 0.6184
+        },
+        "RF": {
+            "cpNum": 0.3367,
+            "cpNum_range": 0.6384
+        },
+        "GB": {
+            "cpNum": 0.3716,
+            "cpNum_range": 0.6141
+        }
+    }
+}
+
 
 # =============================================================================
 # 描画設定（文言はここで変更）
@@ -113,6 +159,13 @@ MODEL_ORDER = ["BL", "LR", "DT", "RF", "GB"]
 MODEL_LABELS = {
     "BL": "BL",
     "LR": "LR",
+    "DT": "DT",
+    "RF": "RF",
+    "GB": "GB",
+}
+
+IMPORTANCE_MODEL_ORDER = ["DT", "RF", "GB"]
+IMPORTANCE_MODEL_LABELS = {
     "DT": "DT",
     "RF": "RF",
     "GB": "GB",
@@ -132,13 +185,24 @@ METRIC_LABELS = {
     "f1": "F値",
 }
 
+FEATURE_ORDER = ["cpNum", "cpNum_range"]
+FEATURE_LABELS = {
+    "cpNum": "C",
+    "cpNum_range": "D",
+}
+
 FIGURE_TITLE = "各モデルの評価結果(適用プロセス)"
+IMPORTANCE_FIGURE_TITLE = "各モデルの特徴量重要度(適用プロセス)"
 YLABEL = "スコア"
+IMPORTANCE_YLABEL = "重要度"
 YLIM = (0.0, 1.05)
 
 FIGURE_SIZE = (15, 5)
-METRIC_COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1"]
+# 白黒印刷向けグレースケール（明→暗）
+METRIC_COLORS = ["#C8C8C8", "#909090", "#585858"]
+FEATURE_COLORS = ["#A0A0A0", "#606060"]
 BAR_ALPHA = 0.85
+BAR_EDGE_COLOR = "black"
 GROUP_GAP = 1.0
 BAR_WIDTH = 0.22
 BAR_LABEL_FONTSIZE = 8
@@ -149,6 +213,7 @@ MODEL_LABEL_Y = -0.15
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "figures"
 OUTPUT_BASENAME = "metrics_apply"
+IMPORTANCE_OUTPUT_BASENAME = "importance_apply"
 OUTPUT_FORMATS = ("png",)
 
 JAPANESE_FONTS = [
@@ -171,31 +236,41 @@ def configure_matplotlib() -> None:
             continue
 
 
-def _validate_scores(
-    metrics_scores: dict[str, dict[str, dict[str, float]]],
+def _validate_grouped_scores(
+    grouped_scores: dict[str, dict[str, dict[str, float]]],
+    *,
+    target_order: list[str],
+    group_order: list[str],
+    item_order: list[str],
+    data_name: str,
 ) -> None:
-    missing_targets = [target for target in TARGET_ORDER if target not in metrics_scores]
+    missing_targets = [target for target in target_order if target not in grouped_scores]
     if missing_targets:
-        raise ValueError(f"METRICS_SCORES に target が不足しています: {missing_targets}")
+        raise ValueError(f"{data_name} に target が不足しています: {missing_targets}")
 
-    for target in TARGET_ORDER:
-        target_scores = metrics_scores[target]
-        for model_name in MODEL_ORDER:
-            if model_name not in target_scores:
+    for target in target_order:
+        target_scores = grouped_scores[target]
+        for group_name in group_order:
+            if group_name not in target_scores:
                 available = ", ".join(sorted(target_scores))
                 raise ValueError(
-                    f"{target} にモデル '{model_name}' がありません。"
+                    f"{target} にグループ '{group_name}' がありません。"
                     f" 利用可能: {available}"
                 )
-            for metric_key in METRIC_ORDER:
-                if metric_key not in target_scores[model_name]:
+            for item_key in item_order:
+                if item_key not in target_scores[group_name]:
                     raise ValueError(
-                        f"{target} / {model_name} に指標 '{metric_key}' がありません"
+                        f"{target} / {group_name} に項目 '{item_key}' がありません"
                     )
 
 
 def _build_grouped_bar_data(
-    target_scores: dict[str, dict[str, float]],
+    group_scores: dict[str, dict[str, float]],
+    *,
+    group_order: list[str],
+    item_order: list[str],
+    item_colors: list[str],
+    group_labels: dict[str, str],
 ) -> tuple[
     list[float],
     list[float],
@@ -205,41 +280,42 @@ def _build_grouped_bar_data(
     list[str],
 ]:
     """1 target 分のグループ化棒グラフ用データを生成する。"""
-    n_metrics = len(METRIC_ORDER)
-    group_stride = n_metrics + GROUP_GAP
+    n_items = len(item_order)
+    group_stride = n_items + GROUP_GAP
 
     heights: list[float] = []
     positions: list[float] = []
     bar_colors: list[str] = []
-    bar_metric_keys: list[str] = []
+    bar_item_keys: list[str] = []
     group_centers: list[float] = []
 
-    for group_idx, model_name in enumerate(MODEL_ORDER):
+    for group_idx, group_name in enumerate(group_order):
         group_start = group_idx * group_stride
-        group_centers.append(group_start + (n_metrics - 1) / 2)
+        group_centers.append(group_start + (n_items - 1) / 2)
 
-        for metric_idx, metric_key in enumerate(METRIC_ORDER):
-            positions.append(group_start + metric_idx)
-            heights.append(target_scores[model_name][metric_key])
-            bar_colors.append(METRIC_COLORS[metric_idx])
-            bar_metric_keys.append(metric_key)
+        for item_idx, item_key in enumerate(item_order):
+            positions.append(group_start + item_idx)
+            heights.append(group_scores[group_name][item_key])
+            bar_colors.append(item_colors[item_idx])
+            bar_item_keys.append(item_key)
 
-    tick_labels = [MODEL_LABELS.get(model, model) for model in MODEL_ORDER]
-    return heights, positions, bar_colors, group_centers, tick_labels, bar_metric_keys
+    tick_labels = [group_labels.get(group_name, group_name) for group_name in group_order]
+    return heights, positions, bar_colors, group_centers, tick_labels, bar_item_keys
 
 
-def _add_bar_metric_labels(
+def _add_bar_item_labels(
     ax: plt.Axes,
     positions: list[float],
-    metric_keys: list[str],
+    item_keys: list[str],
+    item_labels: dict[str, str],
 ) -> None:
-    """各棒の直下に指標ラベルを付ける（白黒印刷でも区別可能にする）。"""
+    """各棒の直下に項目ラベルを付ける（白黒印刷でも区別可能にする）。"""
     label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-    for pos, metric_key in zip(positions, metric_keys):
+    for pos, item_key in zip(positions, item_keys):
         ax.text(
             pos,
             BAR_LABEL_Y,
-            METRIC_LABELS[metric_key],
+            item_labels[item_key],
             ha="right",
             va="top",
             rotation=BAR_LABEL_ROTATION,
@@ -254,7 +330,7 @@ def _add_model_labels(
     group_centers: list[float],
     model_labels: list[str],
 ) -> None:
-    """アルゴリズム名を指標ラベルの下に表示する。"""
+    """アルゴリズム名を項目ラベルの下に表示する。"""
     label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
     for pos, label in zip(group_centers, model_labels):
         ax.text(
@@ -268,23 +344,46 @@ def _add_model_labels(
         )
 
 
-def plot_metrics_bar(
-    metrics_scores: dict[str, dict[str, dict[str, float]]],
+def _plot_grouped_bar_chart(
+    grouped_scores: dict[str, dict[str, dict[str, float]]],
     *,
-    output_dir: Path = OUTPUT_DIR,
-    show: bool = False,
+    target_order: list[str],
+    group_order: list[str],
+    item_order: list[str],
+    item_colors: list[str],
+    group_labels: dict[str, str],
+    item_labels: dict[str, str],
+    target_labels: dict[str, str],
+    figure_title: str,
+    ylabel: str,
+    output_basename: str,
+    output_dir: Path,
+    show: bool,
+    data_name: str,
 ) -> Path:
-    """全アルゴリズムを各 target サブプロット内に横並びで描画する。"""
-    _validate_scores(metrics_scores)
+    """target ごとにグループ化棒グラフを描画する共通処理。"""
+    _validate_grouped_scores(
+        grouped_scores,
+        target_order=target_order,
+        group_order=group_order,
+        item_order=item_order,
+        data_name=data_name,
+    )
 
     configure_matplotlib()
-    fig, axes = plt.subplots(1, len(TARGET_ORDER), figsize=FIGURE_SIZE, sharey=True)
-    if len(TARGET_ORDER) == 1:
+    fig, axes = plt.subplots(1, len(target_order), figsize=FIGURE_SIZE, sharey=True)
+    if len(target_order) == 1:
         axes = [axes]
 
-    for ax, target in zip(axes, TARGET_ORDER):
-        heights, positions, bar_colors, group_centers, tick_labels, bar_metric_keys = (
-            _build_grouped_bar_data(metrics_scores[target])
+    for ax, target in zip(axes, target_order):
+        heights, positions, bar_colors, group_centers, tick_labels, bar_item_keys = (
+            _build_grouped_bar_data(
+                grouped_scores[target],
+                group_order=group_order,
+                item_order=item_order,
+                item_colors=item_colors,
+                group_labels=group_labels,
+            )
         )
 
         ax.bar(
@@ -293,27 +392,27 @@ def plot_metrics_bar(
             width=BAR_WIDTH,
             color=bar_colors,
             alpha=BAR_ALPHA,
-            edgecolor="white",
+            edgecolor=BAR_EDGE_COLOR,
             linewidth=0.5,
         )
 
         ax.set_xticks([])
-        _add_bar_metric_labels(ax, positions, bar_metric_keys)
+        _add_bar_item_labels(ax, positions, bar_item_keys, item_labels)
         _add_model_labels(ax, group_centers, tick_labels)
-        target_label = TARGET_LABELS.get(target, target)
+        target_label = target_labels.get(target, target)
         ax.set_title(target_label, fontsize=12, fontweight="bold")
         ax.set_ylim(*YLIM)
         ax.grid(True, alpha=0.3, axis="y")
 
-    axes[0].set_ylabel(YLABEL, fontsize=12)
-    fig.suptitle(FIGURE_TITLE, fontsize=14, fontweight="bold")
+    axes[0].set_ylabel(ylabel, fontsize=12)
+    fig.suptitle(figure_title, fontsize=14, fontweight="bold")
 
     fig.tight_layout()
 
     output_dir.mkdir(parents=True, exist_ok=True)
     saved_paths: list[Path] = []
     for fmt in OUTPUT_FORMATS:
-        output_path = output_dir / f"{OUTPUT_BASENAME}.{fmt}"
+        output_path = output_dir / f"{output_basename}.{fmt}"
         fig.savefig(output_path, dpi=300, bbox_inches="tight")
         saved_paths.append(output_path)
 
@@ -325,9 +424,59 @@ def plot_metrics_bar(
     return saved_paths[0]
 
 
+def plot_metrics_bar(
+    metrics_scores: dict[str, dict[str, dict[str, float]]],
+    *,
+    output_dir: Path = OUTPUT_DIR,
+    show: bool = False,
+) -> Path:
+    """全アルゴリズムを各 target サブプロット内に横並びで描画する。"""
+    return _plot_grouped_bar_chart(
+        metrics_scores,
+        target_order=TARGET_ORDER,
+        group_order=MODEL_ORDER,
+        item_order=METRIC_ORDER,
+        item_colors=METRIC_COLORS,
+        group_labels=MODEL_LABELS,
+        item_labels=METRIC_LABELS,
+        target_labels=TARGET_LABELS,
+        figure_title=FIGURE_TITLE,
+        ylabel=YLABEL,
+        output_basename=OUTPUT_BASENAME,
+        output_dir=output_dir,
+        show=show,
+        data_name="METRICS_SCORES",
+    )
+
+
+def plot_feature_importance_bar(
+    feature_importances: dict[str, dict[str, dict[str, float]]],
+    *,
+    output_dir: Path = OUTPUT_DIR,
+    show: bool = False,
+) -> Path:
+    """特徴量重要度を各 target サブプロット内に横並びで描画する。"""
+    return _plot_grouped_bar_chart(
+        feature_importances,
+        target_order=TARGET_ORDER,
+        group_order=IMPORTANCE_MODEL_ORDER,
+        item_order=FEATURE_ORDER,
+        item_colors=FEATURE_COLORS,
+        group_labels=IMPORTANCE_MODEL_LABELS,
+        item_labels=FEATURE_LABELS,
+        target_labels=TARGET_LABELS,
+        figure_title=IMPORTANCE_FIGURE_TITLE,
+        ylabel=IMPORTANCE_YLABEL,
+        output_basename=IMPORTANCE_OUTPUT_BASENAME,
+        output_dir=output_dir,
+        show=show,
+        data_name="FEATURE_IMPORTANCES",
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="3種類の目的変数について全アルゴリズムの評価指標を棒グラフで描画する",
+        description="3種類の目的変数について評価指標と特徴量重要度を棒グラフで描画する",
     )
     parser.add_argument(
         "--output-dir",
@@ -340,23 +489,75 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="保存後にウィンドウで表示する",
     )
+    parser.add_argument(
+        "--metrics-only",
+        action="store_true",
+        help="評価指標のみ描画する",
+    )
+    parser.add_argument(
+        "--importance-only",
+        action="store_true",
+        help="特徴量重要度のみ描画する",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    if not METRICS_SCORES:
+    if args.metrics_only and args.importance_only:
+        raise SystemExit("--metrics-only と --importance-only は同時に指定できません。")
+
+    has_metrics = bool(METRICS_SCORES)
+    has_importance = bool(FEATURE_IMPORTANCES)
+
+    if args.metrics_only:
+        plot_metrics = True
+        plot_importance = False
+    elif args.importance_only:
+        plot_metrics = False
+        plot_importance = True
+    else:
+        plot_metrics = has_metrics
+        plot_importance = has_importance
+
+    if not plot_metrics and not plot_importance:
         raise SystemExit(
-            "METRICS_SCORES が空です。"
+            "METRICS_SCORES と FEATURE_IMPORTANCES の両方が空です。"
             " compare_models.py の出力を貼り付けてから実行してください。"
         )
 
-    output_path = plot_metrics_bar(
-        METRICS_SCORES,
-        output_dir=args.output_dir,
-        show=args.show,
-    )
-    print(f"保存しました: {output_path}")
+    saved_paths: list[Path] = []
+
+    if plot_metrics:
+        if not has_metrics:
+            raise SystemExit(
+                "METRICS_SCORES が空です。"
+                " compare_models.py の出力を貼り付けてから実行してください。"
+            )
+        saved_paths.append(
+            plot_metrics_bar(
+                METRICS_SCORES,
+                output_dir=args.output_dir,
+                show=args.show,
+            )
+        )
+
+    if plot_importance:
+        if not has_importance:
+            raise SystemExit(
+                "FEATURE_IMPORTANCES が空です。"
+                " compare_models.py の出力を貼り付けてから実行してください。"
+            )
+        saved_paths.append(
+            plot_feature_importance_bar(
+                FEATURE_IMPORTANCES,
+                output_dir=args.output_dir,
+                show=args.show,
+            )
+        )
+
+    for output_path in saved_paths:
+        print(f"保存しました: {output_path}")
 
 
 if __name__ == "__main__":

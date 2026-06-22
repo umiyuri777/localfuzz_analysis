@@ -1,0 +1,27 @@
+\begin{table}[tb]
+    \caption{各手法における特徴量重要度（\testthird）}
+    \label{tab:all_importance_task2}
+    \centering
+    \begin{tabular}{llrrrr}
+        \hline
+        手法 & 特徴量 & 平均重要度 & 標準偏差 & 最小値 & 最大値 \\\hline \hline
+        \multirow{6}{*}{決定木}         & cpNum\_range & 0.6205 & 0.0090 & 0.6056 & 0.6319 \\
+         & cpNum & 0.3581 & 0.0063 & 0.3495 & 0.3686 \\
+         & tree & 0.0213 & 0.0034 & 0.0168 & 0.0302 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}2] & 0.0001 & 0.0004 & 0.0000 & 0.0014 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}3] & 0.0000 & 0.0000 & 0.0000 & 0.0000 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}4] & 0.0000 & 0.0000 & 0.0000 & 0.0000 \\\hline
+        \multirow{6}{*}{ランダムフォレスト}         & cpNum\_range & 0.6641 & 0.0079 & 0.6443 & 0.6749 \\
+         & cpNum & 0.2929 & 0.0063 & 0.2864 & 0.3086 \\
+         & tree & 0.0248 & 0.0019 & 0.0220 & 0.0295 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}4] & 0.0083 & 0.0010 & 0.0064 & 0.0101 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}2] & 0.0050 & 0.0007 & 0.0042 & 0.0063 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}3] & 0.0049 & 0.0006 & 0.0043 & 0.0062 \\\hline
+        \multirow{6}{*}{勾配ブースティング}         & cpNum\_range & 0.6109 & 0.0089 & 0.5934 & 0.6223 \\
+         & cpNum & 0.3529 & 0.0061 & 0.3454 & 0.3639 \\
+         & tree & 0.0244 & 0.0031 & 0.0209 & 0.0317 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}4] & 0.0089 & 0.0022 & 0.0052 & 0.0139 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}2] & 0.0017 & 0.0005 & 0.0010 & 0.0026 \\
+         & \mathbb{1}[\mathrm{cpNum\_dir}{=}3] & 0.0012 & 0.0007 & 0.0005 & 0.0025 \\\hline
+    \end{tabular}
+\end{table}

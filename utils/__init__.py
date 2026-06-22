@@ -20,6 +20,7 @@ from .decision_tree_analysis import DecisionTreeAnalyzer, build_decision_tree_pi
 from .feature_importance import (
     compute_feature_importance_stats_from_cv,
     compute_feature_importance_stats_from_pipeline,
+    extract_fold_importances_from_cv,
     format_latex_all_importance_table,
     format_latex_value,
     latex_feature_name,
@@ -67,6 +68,7 @@ __all__ = [
     "build_speedup_bug_column_transformer",
     "compute_feature_importance_stats_from_cv",
     "compute_feature_importance_stats_from_pipeline",
+    "extract_fold_importances_from_cv",
     "format_latex_all_importance_table",
     "format_latex_value",
     "latex_feature_name",

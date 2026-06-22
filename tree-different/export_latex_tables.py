@@ -40,6 +40,7 @@ from utils.logistic_regression_analysis import (  # noqa: E402
 )
 from utils.feature_importance import (  # noqa: E402
     compute_feature_importance_stats_from_cv,
+    extract_fold_importances_from_cv,
     format_latex_all_importance_table,
     format_latex_value,
     latex_feature_name,
@@ -125,6 +126,15 @@ MODEL_SPECS: list[tuple[str, str, str]] = [
 ]
 
 BOX_PLOT_MODEL_ORDER = [BASELINE_MODEL_NAME, "LR", "DT", "RF", "GB"]
+IMPORTANCE_BOX_PLOT_MODEL_ORDER = ["DT", "RF", "GB"]
+IMPORTANCE_BOX_PLOT_FEATURE_ORDER = [
+    "tree",
+    "cpNum",
+    "cpNum_range",
+    "cpNum_dir_2",
+    "cpNum_dir_3",
+    "cpNum_dir_4",
+]
 
 
 def _default_logs_root() -> Path:
@@ -439,6 +449,27 @@ def build_box_plot_fold_scores(
     }
 
 
+def build_box_plot_fold_importances(
+    fold_importances: dict[str, dict[str, list[float]]],
+) -> dict[str, dict[str, list[float]]]:
+    """plot_metrics_boxplot.py 用に特徴量重要度の fold データを整形する。"""
+    renamed = {
+        _to_box_plot_model_name(model_name): features
+        for model_name, features in fold_importances.items()
+    }
+    ordered: dict[str, dict[str, list[float]]] = {}
+    for model_name in IMPORTANCE_BOX_PLOT_MODEL_ORDER:
+        if model_name not in renamed:
+            continue
+        feature_scores = renamed[model_name]
+        ordered[model_name] = {
+            feature_name: feature_scores[feature_name]
+            for feature_name in IMPORTANCE_BOX_PLOT_FEATURE_ORDER
+            if feature_name in feature_scores
+        }
+    return ordered
+
+
 def _format_python_float_list(values: list[float]) -> list[str]:
     return [f"{value:.{METRIC_DECIMALS}f}" for value in values]
 
@@ -491,6 +522,18 @@ def format_python_cv_fold_scores_block(
 
     lines.append("}")
     return "\n".join(lines)
+
+
+def format_python_cv_fold_importances_block(
+    all_fold_importances: dict[str, dict[str, dict[str, list[float]]]],
+    *,
+    variable_name: str = "CV_FOLD_IMPORTANCES",
+) -> str:
+    """plot_metrics_boxplot.py へ貼り付けやすい特徴量重要度ブロックを生成する。"""
+    return format_python_cv_fold_scores_block(
+        all_fold_importances,
+        variable_name=variable_name,
+    )
 
 
 def format_latex_all_metrics_table(
@@ -557,7 +600,13 @@ def evaluate_task(
     task_id: str,
     logs_root: Path,
     verbose: bool = False,
-) -> tuple[str, str, str, dict[str, dict[str, list[float]]]]:
+) -> tuple[
+    str,
+    str,
+    str,
+    dict[str, dict[str, list[float]]],
+    dict[str, dict[str, list[float]]],
+]:
     config = TASK_CONFIGS[task_id]
     X, y = load_task_dataset(task_id, logs_root, verbose=verbose)
 
@@ -566,6 +615,7 @@ def evaluate_task(
     fold_scores: dict[str, dict[str, list[float]]] = {
         BASELINE_MODEL_NAME: compute_baseline_fold_scores(X, y),
     }
+    fold_importances: dict[str, dict[str, list[float]]] = {}
 
     for model_key, model_name, _ in MODEL_SPECS:
         pipeline, step_name = build_pipeline(model_key, task_id)
@@ -585,6 +635,11 @@ def evaluate_task(
                 exclude_cpnum_dir=False,
             )
             model_importances.append((model_name, importance_stats))
+            fold_importances[model_name] = extract_fold_importances_from_cv(
+                cv_results,
+                step_name,
+                exclude_cpnum_dir=False,
+            )
 
     metrics_table = format_latex_all_metrics_table(
         model_metrics,
@@ -597,7 +652,7 @@ def evaluate_task(
         label=config.importance_label,
     )
     logistic_latex = build_logistic_latex(X, y, config)
-    return metrics_table, importance_table, logistic_latex, fold_scores
+    return metrics_table, importance_table, logistic_latex, fold_scores, fold_importances
 
 
 def parse_args() -> argparse.Namespace:
@@ -639,6 +694,7 @@ def main() -> None:
         args.output_dir.mkdir(parents=True, exist_ok=True)
 
     all_fold_scores: dict[str, dict[str, dict[str, list[float]]]] = {}
+    all_fold_importances: dict[str, dict[str, dict[str, list[float]]]] = {}
 
     for task_id in task_ids:
         config = TASK_CONFIGS[task_id]
@@ -646,12 +702,19 @@ def main() -> None:
         print(f"【{task_id}】{config.description}")
         print("=" * 88)
 
-        metrics_table, importance_table, logistic_latex, fold_scores = evaluate_task(
+        (
+            metrics_table,
+            importance_table,
+            logistic_latex,
+            fold_scores,
+            fold_importances,
+        ) = evaluate_task(
             task_id,
             logs_root,
             verbose=args.verbose,
         )
         all_fold_scores[task_id] = build_box_plot_fold_scores(fold_scores)
+        all_fold_importances[task_id] = build_box_plot_fold_importances(fold_importances)
 
         print("\n【LaTeX形式：各手法の評価結果】")
         print("-" * 88)
@@ -690,6 +753,22 @@ def main() -> None:
                 encoding="utf-8",
             )
             print(f"保存しました: {boxplot_data_path}")
+            print()
+
+    if all_fold_importances:
+        print("=" * 88)
+        print("【貼り付け用：plot_metrics_boxplot.py の CV_FOLD_IMPORTANCES】")
+        print("=" * 88)
+        print(format_python_cv_fold_importances_block(all_fold_importances))
+        print()
+
+        if args.output_dir is not None:
+            importance_data_path = args.output_dir / "cv_fold_importances.py"
+            importance_data_path.write_text(
+                format_python_cv_fold_importances_block(all_fold_importances) + "\n",
+                encoding="utf-8",
+            )
+            print(f"保存しました: {importance_data_path}")
             print()
 
 

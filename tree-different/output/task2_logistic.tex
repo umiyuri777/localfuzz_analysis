@@ -1,0 +1,23 @@
+\begin{equation}
+\label{eq:logistic_all_scaled_prospect}
+\begin{aligned}
+  P &= \frac{1}{1 + \exp(-z)}, \\
+  z &= -0.801 + 0.143\, tree_{std} + 0.468\, cpNum_{std} \\
+    &\quad + 1.334\, cpNum\_range_{std} \\
+    &\quad - 0.121\, \mathbb{1}[\mathrm{cpNum\_dir}{=}2] \\
+    &\quad - 0.076\, \mathbb{1}[\mathrm{cpNum\_dir}{=}3] \\
+    &\quad - 0.076\, \mathbb{1}[\mathrm{cpNum\_dir}{=}4]
+\end{aligned}
+\end{equation}
+
+\begin{equation}
+\label{eq:standardization_task2}
+\begin{aligned}
+  x_{std} &= \frac{x - \mu}{\sigma}, \\
+  tree &: \mu=500.0,\ \sigma \approx 408.2, \\
+  cpNum &: \mu=225.0,\ \sigma \approx 234.0, \\
+  cpNum\_range &: \mu=50.0,\ \sigma \approx 40.0, \\
+  \mathrm{cpNum\_dir} &: \text{象限 1 を基準カテゴリとする} \\
+    &\quad \text{one-hot 符号化}
+\end{aligned}
+\end{equation}
