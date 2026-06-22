@@ -462,6 +462,7 @@ def evaluate_task(
             importance_stats = compute_feature_importance_stats_from_cv(
                 cv_results,
                 step_name,
+                exclude_cpnum_dir=False,
             )
             model_importances.append((model_name, importance_stats))
 

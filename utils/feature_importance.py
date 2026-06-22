@@ -22,7 +22,7 @@ def normalized_feature_name(name: str) -> str:
 
 
 def is_cpnum_dir_feature(name: str) -> bool:
-    """cpNum_dir の one-hot 列か（重要度表には載せない）。"""
+    """cpNum_dir の one-hot 列かどうかを判定する。"""
     normalized = normalized_feature_name(name)
     return normalized == "cpNum_dir" or normalized.startswith("cpNum_dir_")
 
@@ -30,6 +30,9 @@ def is_cpnum_dir_feature(name: str) -> bool:
 def latex_feature_name(name: str) -> str:
     """特徴量名を LaTeX 表のセル用に整形する。"""
     name = normalized_feature_name(name)
+    if name.startswith("cpNum_dir_"):
+        level = name.split("_", 2)[-1]
+        return rf"\mathbb{{1}}[\mathrm{{cpNum\_dir}}{{=}}{level}]"
     latex_names = {
         "tree": r"tree",
         "cpNum": r"cpNum",

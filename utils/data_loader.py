@@ -16,6 +16,10 @@ def parse_directory_name(dir_name: str) -> Tuple[Optional[int], Optional[int], O
     """
     ディレクトリ名をパースしてcpNum, cpNum_range, cpNum_dirを抽出する。
 
+    cpNum1..10, cpNum_range1..10, cpNum_dir1..10 は同一添字位置の値が
+    1つのテストケースを表す。cpNum ブロックで非ゼロが見つかった添字 i から
+    cpNum_range(i+10), cpNum_dir(i+20) を読む。
+
     Args:
         dir_name: ディレクトリ名（例: "0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1"）
 
@@ -27,25 +31,18 @@ def parse_directory_name(dir_name: str) -> Tuple[Optional[int], Optional[int], O
         return None, None, None
 
     try:
-        cpnum: Optional[int] = None
-        cpnum_range: Optional[int] = None
-        cpnum_dir: Optional[int] = None
-
+        param_index: Optional[int] = None
         for i in range(10):
             if int(params[i]) != 0:
-                cpnum = int(params[i])
+                param_index = i
                 break
 
-        for i in range(10, 20):
-            if int(params[i]) != 0:
-                cpnum_range = int(params[i])
-                break
+        if param_index is None:
+            return None, None, None
 
-        for i in range(20, 30):
-            if int(params[i]) != 0:
-                cpnum_dir = int(params[i])
-                break
-
+        cpnum = int(params[param_index])
+        cpnum_range = int(params[10 + param_index])
+        cpnum_dir = int(params[20 + param_index])
         return cpnum, cpnum_range, cpnum_dir
     except (ValueError, IndexError):
         return None, None, None
