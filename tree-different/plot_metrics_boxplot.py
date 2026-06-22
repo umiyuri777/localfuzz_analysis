@@ -312,18 +312,6 @@ def plot_metrics_boxplot(
     axes[0].set_ylabel(YLABEL, fontsize=12)
     fig.suptitle(FIGURE_TITLE, fontsize=14, fontweight="bold")
 
-    # legend_handles = [
-    #     mpatches.Patch(facecolor=color, alpha=BOX_ALPHA, label=METRIC_LABELS[metric_key])
-    #     for metric_key, color in zip(METRIC_ORDER, METRIC_COLORS)
-    # ]
-    # fig.legend(
-    #     # handles=legend_handles,
-    #     loc="upper center",
-    #     bbox_to_anchor=(0.5, 0.02),
-    #     ncol=len(METRIC_ORDER),
-    #     frameon=False,
-    # )
-
     fig.tight_layout()
 
     output_dir.mkdir(parents=True, exist_ok=True)
