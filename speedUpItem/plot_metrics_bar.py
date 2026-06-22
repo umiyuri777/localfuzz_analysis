@@ -17,7 +17,7 @@ import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+import matplotlib.transforms as mtransforms
 
 # =============================================================================
 # 貼り付け用データ（compare_models.py の出力をここにコピー）
@@ -132,7 +132,7 @@ METRIC_LABELS = {
     "f1": "F値",
 }
 
-FIGURE_TITLE = "各モデルの評価結果"
+FIGURE_TITLE = "各モデルの評価結果(適用プロセス)"
 YLABEL = "スコア"
 YLIM = (0.0, 1.05)
 
@@ -141,6 +141,11 @@ METRIC_COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1"]
 BAR_ALPHA = 0.85
 GROUP_GAP = 1.0
 BAR_WIDTH = 0.22
+BAR_LABEL_FONTSIZE = 8
+BAR_LABEL_ROTATION = 45
+BAR_LABEL_Y = -0.02
+MODEL_LABEL_FONTSIZE = 15
+MODEL_LABEL_Y = -0.15
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "figures"
 OUTPUT_BASENAME = "metrics_bar_all"
@@ -191,7 +196,14 @@ def _validate_scores(
 
 def _build_grouped_bar_data(
     target_scores: dict[str, dict[str, float]],
-) -> tuple[list[float], list[float], list[str], list[str], list[float]]:
+) -> tuple[
+    list[float],
+    list[float],
+    list[str],
+    list[float],
+    list[str],
+    list[str],
+]:
     """1 target 分のグループ化棒グラフ用データを生成する。"""
     n_metrics = len(METRIC_ORDER)
     group_stride = n_metrics + GROUP_GAP
@@ -199,6 +211,7 @@ def _build_grouped_bar_data(
     heights: list[float] = []
     positions: list[float] = []
     bar_colors: list[str] = []
+    bar_metric_keys: list[str] = []
     group_centers: list[float] = []
 
     for group_idx, model_name in enumerate(MODEL_ORDER):
@@ -209,9 +222,50 @@ def _build_grouped_bar_data(
             positions.append(group_start + metric_idx)
             heights.append(target_scores[model_name][metric_key])
             bar_colors.append(METRIC_COLORS[metric_idx])
+            bar_metric_keys.append(metric_key)
 
     tick_labels = [MODEL_LABELS.get(model, model) for model in MODEL_ORDER]
-    return heights, positions, bar_colors, tick_labels, group_centers
+    return heights, positions, bar_colors, group_centers, tick_labels, bar_metric_keys
+
+
+def _add_bar_metric_labels(
+    ax: plt.Axes,
+    positions: list[float],
+    metric_keys: list[str],
+) -> None:
+    """各棒の直下に指標ラベルを付ける（白黒印刷でも区別可能にする）。"""
+    label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+    for pos, metric_key in zip(positions, metric_keys):
+        ax.text(
+            pos,
+            BAR_LABEL_Y,
+            METRIC_LABELS[metric_key],
+            ha="right",
+            va="top",
+            rotation=BAR_LABEL_ROTATION,
+            rotation_mode="anchor",
+            fontsize=BAR_LABEL_FONTSIZE,
+            transform=label_transform,
+        )
+
+
+def _add_model_labels(
+    ax: plt.Axes,
+    group_centers: list[float],
+    model_labels: list[str],
+) -> None:
+    """アルゴリズム名を指標ラベルの下に表示する。"""
+    label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+    for pos, label in zip(group_centers, model_labels):
+        ax.text(
+            pos,
+            MODEL_LABEL_Y,
+            label,
+            ha="center",
+            va="top",
+            fontsize=MODEL_LABEL_FONTSIZE,
+            transform=label_transform,
+        )
 
 
 def plot_metrics_bar(
@@ -229,7 +283,7 @@ def plot_metrics_bar(
         axes = [axes]
 
     for ax, target in zip(axes, TARGET_ORDER):
-        heights, positions, bar_colors, tick_labels, group_centers = (
+        heights, positions, bar_colors, group_centers, tick_labels, bar_metric_keys = (
             _build_grouped_bar_data(metrics_scores[target])
         )
 
@@ -243,8 +297,9 @@ def plot_metrics_bar(
             linewidth=0.5,
         )
 
-        ax.set_xticks(group_centers)
-        ax.set_xticklabels(tick_labels)
+        ax.set_xticks([])
+        _add_bar_metric_labels(ax, positions, bar_metric_keys)
+        _add_model_labels(ax, group_centers, tick_labels)
         target_label = TARGET_LABELS.get(target, target)
         ax.set_title(target_label, fontsize=12, fontweight="bold")
         ax.set_ylim(*YLIM)
@@ -253,20 +308,7 @@ def plot_metrics_bar(
     axes[0].set_ylabel(YLABEL, fontsize=12)
     fig.suptitle(FIGURE_TITLE, fontsize=14, fontweight="bold")
 
-    legend_handles = [
-        mpatches.Patch(facecolor=color, alpha=BAR_ALPHA, label=METRIC_LABELS[metric_key])
-        for metric_key, color in zip(METRIC_ORDER, METRIC_COLORS)
-    ]
-    fig.legend(
-        handles=legend_handles,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.02),
-        ncol=len(METRIC_ORDER),
-        frameon=False,
-    )
-
     fig.tight_layout()
-    fig.subplots_adjust(bottom=0.15)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     saved_paths: list[Path] = []

@@ -134,7 +134,7 @@ METRIC_LABELS = {
     "f1": "F値",
 }
 
-FIGURE_TITLE = "10分割交差検証の評価指標"
+FIGURE_TITLE = "各モデルの評価結果(モデル構築プロセス)"
 YLABEL = "スコア"
 YLIM = (0.0, 1.02)  # 1.0 ちょうどの箱ひげが上端で見えなくなるのを防ぐ
 
@@ -316,13 +316,13 @@ def plot_metrics_boxplot(
     #     mpatches.Patch(facecolor=color, alpha=BOX_ALPHA, label=METRIC_LABELS[metric_key])
     #     for metric_key, color in zip(METRIC_ORDER, METRIC_COLORS)
     # ]
-    fig.legend(
-        # handles=legend_handles,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.02),
-        ncol=len(METRIC_ORDER),
-        frameon=False,
-    )
+    # fig.legend(
+    #     # handles=legend_handles,
+    #     loc="upper center",
+    #     bbox_to_anchor=(0.5, 0.02),
+    #     ncol=len(METRIC_ORDER),
+    #     frameon=False,
+    # )
 
     fig.tight_layout()
 
