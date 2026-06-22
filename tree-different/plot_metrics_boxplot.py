@@ -15,8 +15,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+import matplotlib.path as mpath
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import matplotlib.transforms as mtransforms
+import numpy as np
 
 # =============================================================================
 # 貼り付け用データ（export_latex_tables.py の出力をここにコピー）
@@ -110,7 +113,7 @@ CV_FOLD_SCORES: dict[str, dict[str, dict[str, list[float]]]] = {
 # =============================================================================
 MODEL_ORDER = ["BL", "LR", "DT", "RF", "GB"]
 MODEL_LABELS = {
-    "BL": "Baseline",
+    "BL": "BL",
     "LR": "LR",
     "DT": "DT",
     "RF": "RF",
@@ -119,9 +122,9 @@ MODEL_LABELS = {
 
 TASK_ORDER = ["task0", "task1", "task2"]
 TASK_LABELS = {
-    "task0": "1回の実行でバグ発見",
-    "task1": "5回中1回でもバグ発見",
-    "task2": "5回全てバグ発見",
+    "task0": "単回",
+    "task1": "1回以上",
+    "task2": "全回",
 }
 
 METRIC_ORDER = ["precision", "recall", "f1"]
@@ -133,13 +136,19 @@ METRIC_LABELS = {
 
 FIGURE_TITLE = "10分割交差検証の評価指標"
 YLABEL = "スコア"
-YLIM = (0.0, 1.0)
+YLIM = (0.0, 1.02)  # 1.0 ちょうどの箱ひげが上端で見えなくなるのを防ぐ
 
-FIGURE_SIZE = (22, 5)
+FIGURE_SIZE = (15, 5)
 METRIC_COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1"]
 BOX_ALPHA = 0.7
-GROUP_GAP = 1.0
-BOX_WIDTH = 0.22
+GROUP_GAP = 0.4
+METRIC_SPACING = 0.3
+BOX_WIDTH = 0.2
+BOX_LABEL_FONTSIZE = 8
+BOX_LABEL_ROTATION = 45
+BOX_LABEL_Y = -0.02
+MODEL_LABEL_FONTSIZE = 15
+MODEL_LABEL_Y = -0.15
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "figures"
 OUTPUT_BASENAME = "metrics_boxplot_all"
@@ -190,27 +199,76 @@ def _validate_scores(
 
 def _build_grouped_boxplot_data(
     task_scores: dict[str, dict[str, list[float]]],
-) -> tuple[list[list[float]], list[float], list[str], list[float], list[str]]:
+) -> tuple[
+    list[list[float]],
+    list[float],
+    list[str],
+    list[float],
+    list[str],
+    list[str],
+]:
     """1 task 分のグループ化箱ひげ図用データを生成する。"""
     n_metrics = len(METRIC_ORDER)
-    group_stride = n_metrics + GROUP_GAP
+    group_stride = (n_metrics - 1) * METRIC_SPACING + GROUP_GAP + METRIC_SPACING
 
     box_data: list[list[float]] = []
     positions: list[float] = []
     box_colors: list[str] = []
+    box_metric_keys: list[str] = []
     group_centers: list[float] = []
 
     for group_idx, model_name in enumerate(MODEL_ORDER):
         group_start = group_idx * group_stride
-        group_centers.append(group_start + (n_metrics - 1) / 2)
+        group_centers.append(group_start + (n_metrics - 1) * METRIC_SPACING / 2)
 
         for metric_idx, metric_key in enumerate(METRIC_ORDER):
-            positions.append(group_start + metric_idx)
+            positions.append(group_start + metric_idx * METRIC_SPACING)
             box_data.append(task_scores[model_name][metric_key])
             box_colors.append(METRIC_COLORS[metric_idx])
+            box_metric_keys.append(metric_key)
 
     tick_labels = [MODEL_LABELS.get(model, model) for model in MODEL_ORDER]
-    return box_data, positions, box_colors, group_centers, tick_labels
+    return box_data, positions, box_colors, group_centers, tick_labels, box_metric_keys
+
+
+def _add_box_metric_labels(
+    ax: plt.Axes,
+    positions: list[float],
+    metric_keys: list[str],
+) -> None:
+    """各箱ひげ図の直下に指標ラベルを付ける（白黒印刷でも区別可能にする）。"""
+    label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+    for pos, metric_key in zip(positions, metric_keys):
+        ax.text(
+            pos,
+            BOX_LABEL_Y,
+            METRIC_LABELS[metric_key],
+            ha="right",
+            va="top",
+            rotation=BOX_LABEL_ROTATION,
+            rotation_mode="anchor",
+            fontsize=BOX_LABEL_FONTSIZE,
+            transform=label_transform,
+        )
+
+
+def _add_model_labels(
+    ax: plt.Axes,
+    group_centers: list[float],
+    model_labels: list[str],
+) -> None:
+    """アルゴリズム名を指標ラベルの下に表示する。"""
+    label_transform = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+    for pos, label in zip(group_centers, model_labels):
+        ax.text(
+            pos,
+            MODEL_LABEL_Y,
+            label,
+            ha="center",
+            va="top",
+            fontsize=MODEL_LABEL_FONTSIZE,
+            transform=label_transform,
+        )
 
 
 def plot_metrics_boxplot(
@@ -228,7 +286,7 @@ def plot_metrics_boxplot(
         axes = [axes]
 
     for ax, task_id in zip(axes, TASK_ORDER):
-        box_data, positions, box_colors, group_centers, tick_labels = (
+        box_data, positions, box_colors, group_centers, tick_labels, box_metric_keys = (
             _build_grouped_boxplot_data(cv_fold_scores[task_id])
         )
 
@@ -243,8 +301,9 @@ def plot_metrics_boxplot(
             patch.set_facecolor(color)
             patch.set_alpha(BOX_ALPHA)
 
-        ax.set_xticks(group_centers)
-        ax.set_xticklabels(tick_labels)
+        ax.set_xticks([])
+        _add_box_metric_labels(ax, positions, box_metric_keys)
+        _add_model_labels(ax, group_centers, tick_labels)
         task_label = TASK_LABELS.get(task_id, task_id)
         ax.set_title(task_label, fontsize=12, fontweight="bold")
         ax.set_ylim(*YLIM)
@@ -253,12 +312,12 @@ def plot_metrics_boxplot(
     axes[0].set_ylabel(YLABEL, fontsize=12)
     fig.suptitle(FIGURE_TITLE, fontsize=14, fontweight="bold")
 
-    legend_handles = [
-        mpatches.Patch(facecolor=color, alpha=BOX_ALPHA, label=METRIC_LABELS[metric_key])
-        for metric_key, color in zip(METRIC_ORDER, METRIC_COLORS)
-    ]
+    # legend_handles = [
+    #     mpatches.Patch(facecolor=color, alpha=BOX_ALPHA, label=METRIC_LABELS[metric_key])
+    #     for metric_key, color in zip(METRIC_ORDER, METRIC_COLORS)
+    # ]
     fig.legend(
-        handles=legend_handles,
+        # handles=legend_handles,
         loc="upper center",
         bbox_to_anchor=(0.5, 0.02),
         ncol=len(METRIC_ORDER),
@@ -266,7 +325,6 @@ def plot_metrics_boxplot(
     )
 
     fig.tight_layout()
-    fig.subplots_adjust(bottom=0.15)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     saved_paths: list[Path] = []

@@ -164,13 +164,15 @@ def collect_data_aggregated_flat(
 ) -> pd.DataFrame:
     """
     tree=* なしの flat な Logs から集約データを収集する。
-    各サブディレクトリ名は「cpNum1..10, cpNum_range1..10, cpNum_dir1..10, tree」の31個のカンマ区切り。
+    各サブディレクトリ名は「cpNum1..10, cpNum_range1..10, cpNum_dir1..10」の30個のカンマ区切り。
+    末尾に tree を付けた31個の形式も後方互換で受け付ける。
     tree_value を指定した場合は30個のカンマ区切り（tree なし）のディレクトリ名も受け付ける。
 
     Args:
         logs_root: Logs ディレクトリのパス（直下にパラメータディレクトリがある）。
         verbose: 基本統計を表示するか。
-        tree_value: 指定時は dir 名を30値として扱い、レコードの tree にこの値を使う。None のときは31値（末尾が tree）を要求。
+        tree_value: 指定時は dir 名を30値として扱い、レコードの tree にこの値を使う。
+            None のときは30値、または末尾に tree を付けた31値を受け付ける。
 
     Returns:
         DataFrame。列: dir_name, tree, cpNum, cpNum_range, cpNum_dir, bug_detected_any, bug_detected_all, bug_count
@@ -184,17 +186,18 @@ def collect_data_aggregated_flat(
 
         dir_name = param_dir.name
         params = dir_name.split(",")
+        if len(params) < 30:
+            continue
+
         if tree_value is not None:
-            if len(params) < 30:
-                continue
             current_tree = tree_value
-        else:
-            if len(params) < 31:
-                continue
+        elif len(params) >= 31:
             try:
                 current_tree = int(params[30])
             except (ValueError, IndexError):
                 continue
+        else:
+            current_tree = None
 
         cpnum, cpnum_range, cpnum_dir = parse_directory_name(",".join(params[:30]))
         if cpnum is None or cpnum_range is None or cpnum_dir is None:
@@ -250,7 +253,8 @@ def collect_data_per_run_flat(
     Args:
         logs_root: Logs ディレクトリのパス（直下にパラメータディレクトリがある）。
         verbose: 基本統計を表示するか。
-        tree_value: 指定時は dir 名を30値として受け付ける。None のときは31値（末尾が tree）を要求。
+        tree_value: 指定時は dir 名を30値として受け付ける。
+            None のときは30値、または末尾に tree を付けた31値を受け付ける。
 
     Returns:
         DataFrame。列: dir_name, run_index (1～5), bug_detected (0/1)
@@ -264,12 +268,10 @@ def collect_data_per_run_flat(
 
         dir_name = param_dir.name
         params = dir_name.split(",")
-        if tree_value is not None:
-            if len(params) < 30:
-                continue
-        else:
-            if len(params) < 31:
-                continue
+        if len(params) < 30:
+            continue
+
+        if tree_value is None and len(params) >= 31:
             try:
                 int(params[30])
             except (ValueError, IndexError):
