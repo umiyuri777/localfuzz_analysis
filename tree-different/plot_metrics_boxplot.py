@@ -151,7 +151,7 @@ MODEL_LABEL_FONTSIZE = 15
 MODEL_LABEL_Y = -0.15
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "figures"
-OUTPUT_BASENAME = "metrics_boxplot_all"
+OUTPUT_BASENAME = "metrics_model"
 OUTPUT_FORMATS = ("png",)  # 日本語ラベル利用時は pdf はフォント設定が必要
 
 JAPANESE_FONTS = [
