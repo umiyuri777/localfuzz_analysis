@@ -106,47 +106,77 @@ METRICS_SCORES: dict[str, dict[str, dict[str, float]]] = {
     }
 }
 
+# =============================================================================
+# 貼り付け用データ（compare_models.py の出力をここにコピー）
+# =============================================================================
 FEATURE_IMPORTANCES: dict[str, dict[str, dict[str, float]]] = {
     "per_run": {
         "DT": {
             "cpNum": 0.3351,
-            "cpNum_range": 0.6642
+            "cpNum_range": 0.6642,
+            "cpNum_dir_2": 0.0002,
+            "cpNum_dir_3": 0.0000,
+            "cpNum_dir_4": 0.0005
         },
         "RF": {
             "cpNum": 0.2805,
-            "cpNum_range": 0.7127
+            "cpNum_range": 0.7127,
+            "cpNum_dir_2": 0.0020,
+            "cpNum_dir_3": 0.0020,
+            "cpNum_dir_4": 0.0027
         },
         "GB": {
             "cpNum": 0.3342,
-            "cpNum_range": 0.6589
+            "cpNum_range": 0.6589,
+            "cpNum_dir_2": 0.0010,
+            "cpNum_dir_3": 0.0030,
+            "cpNum_dir_4": 0.0029
         }
     },
     "bug_detected_any": {
         "DT": {
             "cpNum": 0.2634,
-            "cpNum_range": 0.7183
+            "cpNum_range": 0.7183,
+            "cpNum_dir_2": 0.0159,
+            "cpNum_dir_3": 0.0017,
+            "cpNum_dir_4": 0.0006
         },
         "RF": {
             "cpNum": 0.3049,
-            "cpNum_range": 0.6197
+            "cpNum_range": 0.6197,
+            "cpNum_dir_2": 0.0288,
+            "cpNum_dir_3": 0.0236,
+            "cpNum_dir_4": 0.0231
         },
         "GB": {
             "cpNum": 0.2837,
-            "cpNum_range": 0.6622
+            "cpNum_range": 0.6622,
+            "cpNum_dir_2": 0.0218,
+            "cpNum_dir_3": 0.0061,
+            "cpNum_dir_4": 0.0261
         }
     },
     "bug_detected_all": {
         "DT": {
             "cpNum": 0.3702,
-            "cpNum_range": 0.6184
+            "cpNum_range": 0.6184,
+            "cpNum_dir_2": 0.0018,
+            "cpNum_dir_3": 0.0013,
+            "cpNum_dir_4": 0.0082
         },
         "RF": {
             "cpNum": 0.3367,
-            "cpNum_range": 0.6384
+            "cpNum_range": 0.6384,
+            "cpNum_dir_2": 0.0059,
+            "cpNum_dir_3": 0.0066,
+            "cpNum_dir_4": 0.0125
         },
         "GB": {
             "cpNum": 0.3716,
-            "cpNum_range": 0.6141
+            "cpNum_range": 0.6141,
+            "cpNum_dir_2": 0.0022,
+            "cpNum_dir_3": 0.0023,
+            "cpNum_dir_4": 0.0098
         }
     }
 }
@@ -173,9 +203,9 @@ IMPORTANCE_MODEL_LABELS = {
 
 TARGET_ORDER = ["per_run", "bug_detected_any", "bug_detected_all"]
 TARGET_LABELS = {
-    "per_run": "単回",
-    "bug_detected_any": "1回以上",
-    "bug_detected_all": "全回",
+    "per_run": "Single",
+    "bug_detected_any": "Partial",
+    "bug_detected_all": "All",
 }
 
 METRIC_ORDER = ["precision", "recall", "f1"]
@@ -185,10 +215,19 @@ METRIC_LABELS = {
     "f1": "F値",
 }
 
-FEATURE_ORDER = ["cpNum", "cpNum_range"]
+FEATURE_ORDER = [
+    "cpNum",
+    "cpNum_range",
+    "cpNum_dir_2",
+    "cpNum_dir_3",
+    "cpNum_dir_4",
+]
 FEATURE_LABELS = {
     "cpNum": "C",
     "cpNum_range": "D",
+    "cpNum_dir_2": "E=2",
+    "cpNum_dir_3": "E=3",
+    "cpNum_dir_4": "E=4",
 }
 
 FIGURE_TITLE = "各モデルの評価結果(適用プロセス)"
@@ -200,14 +239,17 @@ YLIM = (0.0, 1.05)
 FIGURE_SIZE = (15, 5)
 # 白黒印刷向けグレースケール（明→暗）
 METRIC_COLORS = ["#C8C8C8", "#909090", "#585858"]
-FEATURE_COLORS = ["#A0A0A0", "#606060"]
+FEATURE_COLORS = ["#C0C0C0", "#909090", "#707070", "#505050", "#303030"]
 BAR_ALPHA = 0.85
 BAR_EDGE_COLOR = "black"
 GROUP_GAP = 1.0
 BAR_WIDTH = 0.22
 BAR_LABEL_FONTSIZE = 8
-BAR_LABEL_ROTATION = 45
+BAR_LABEL_ROTATION = 90
 BAR_LABEL_Y = -0.02
+BAR_VALUE_LABEL_FONTSIZE = 7
+BAR_VALUE_LABEL_OFFSET = 0.015
+BAR_VALUE_LABEL_FORMAT = "{:.2f}"
 MODEL_LABEL_FONTSIZE = 15
 MODEL_LABEL_Y = -0.15
 
@@ -325,6 +367,42 @@ def _add_bar_item_labels(
         )
 
 
+def _add_bar_value_labels(
+    ax: plt.Axes,
+    bars: list[object],
+    *,
+    y_offset: float,
+    value_format: str,
+    show_zero: bool,
+) -> None:
+    """各棒の上に数値ラベルを付ける。0 値でも表示する。"""
+    y_min, y_max = ax.get_ylim()
+    # y_max 側でラベルが切れないように、上限を少し引いておく。
+    y_cap = y_max - (y_offset / 2)
+
+    for bar in bars:
+        height = float(bar.get_height())
+        if not show_zero and abs(height) < 1e-12:
+            continue
+
+        label = value_format.format(height)
+        x = bar.get_x() + bar.get_width() / 2
+        y = height + y_offset
+        if y > y_cap:
+            y = y_cap
+
+        ax.text(
+            x,
+            y,
+            label,
+            ha="center",
+            va="bottom",
+            fontsize=BAR_VALUE_LABEL_FONTSIZE,
+            color="black",
+            clip_on=False,
+        )
+
+
 def _add_model_labels(
     ax: plt.Axes,
     group_centers: list[float],
@@ -386,7 +464,7 @@ def _plot_grouped_bar_chart(
             )
         )
 
-        ax.bar(
+        bar_container = ax.bar(
             positions,
             heights,
             width=BAR_WIDTH,
@@ -402,6 +480,15 @@ def _plot_grouped_bar_chart(
         target_label = target_labels.get(target, target)
         ax.set_title(target_label, fontsize=12, fontweight="bold")
         ax.set_ylim(*YLIM)
+
+        # 棒の上の数値ラベル。0 値でも表示する。
+        _add_bar_value_labels(
+            ax,
+            list(bar_container.patches),
+            y_offset=BAR_VALUE_LABEL_OFFSET,
+            value_format=BAR_VALUE_LABEL_FORMAT,
+            show_zero=True,
+        )
         ax.grid(True, alpha=0.3, axis="y")
 
     axes[0].set_ylabel(ylabel, fontsize=12)

@@ -1,6 +1,6 @@
 """
 speedUpItem: 4つのアルゴリズム（ロジスティック回帰・決定木・ランダムフォレスト・勾配ブースティング）を
-一括実行し、適合率・再現率・F値・正解率を表形式で比較する。
+一括実行し、適合率・再現率・F値・正解率・AUC を表形式で比較する。
 """
 
 import argparse
@@ -55,7 +55,13 @@ TARGET_ORDER = ["per_run", "bug_detected_any", "bug_detected_all"]
 
 PLOT_MODEL_ORDER = ["BL", "LR", "DT", "RF", "GB"]
 IMPORTANCE_MODEL_ORDER = ["DT", "RF", "GB"]
-PLOT_FEATURE_ORDER = ["cpNum", "cpNum_range"]
+PLOT_FEATURE_ORDER = [
+    "cpNum",
+    "cpNum_range",
+    "cpNum_dir_2",
+    "cpNum_dir_3",
+    "cpNum_dir_4",
+]
 MODEL_NAME_TO_PLOT = {
     BASELINE_MODEL_NAME: "BL",
     "ロジスティック回帰": "LR",
@@ -165,6 +171,7 @@ def format_latex_baseline_result(
         ("適合率", metrics["precision"]),
         ("再現率", metrics["recall"]),
         ("F値", metrics["f1"]),
+        ("AUC", metrics.get("auc")),
     ]
     body_lines = []
     for i, (name, value) in enumerate(rows):
@@ -238,9 +245,9 @@ def format_latex_comparison_table(
         f"    \\caption{{{caption}}}",
         f"    \\label{{{label}}}",
         r"    \centering",
-        r"    \begin{tabular}{lrrr}",
+        r"    \begin{tabular}{lrrrr}",
         r"        \hline",
-        r"        アルゴリズム & 適合率 & 再現率 & F値 \\",
+        r"        アルゴリズム & 適合率 & 再現率 & F値 & AUC \\",
         r"        \hline \hline",
     ]
     for name, metrics in results:
@@ -248,7 +255,8 @@ def format_latex_comparison_table(
             f"        {name} & "
             f"{_format_latex_metric(metrics['precision'])} & "
             f"{_format_latex_metric(metrics['recall'])} & "
-            f"{_format_latex_metric(metrics['f1'])} \\\\"
+            f"{_format_latex_metric(metrics['f1'])} & "
+            f"{_format_latex_metric(metrics.get('auc'))} \\\\"
         )
     lines.extend([
         r"        \hline",
@@ -486,7 +494,9 @@ def _collect_feature_importances(target: str) -> list[tuple[str, list[dict[str, 
     for name, model in _build_models(target):
         model.fit(X_train, y_train)
         if name != LOGISTIC_MODEL_NAME:
-            importance_stats = compute_feature_importance_stats_from_pipeline(model)
+            importance_stats = compute_feature_importance_stats_from_pipeline(
+                model, exclude_cpnum_dir=False
+            )
             model_importances.append((name, importance_stats))
     return model_importances
 

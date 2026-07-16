@@ -3,7 +3,9 @@ tree-different/task0, task1, task2 について、
 4手法の10分割交差検証結果を LaTeX 表形式で一括出力する。
 
 出力:
-- 各手法の評価結果（適合率・再現率・F値）
+- 全シナリオ横断の評価結果表（適合率・再現率・F値・AUC）
+- ベースライン・各手法の比較表（適合率・再現率・F値・正解率・AUC）
+- 各手法の評価結果（適合率・再現率・F値・AUC）
 - ロジスティック回帰以外の特徴量重要度
 - ロジスティック回帰式（標準化数値＋cpNum_dir の one-hot）
 """
@@ -18,7 +20,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.pipeline import Pipeline
 
@@ -58,13 +66,33 @@ METRIC_ROWS = [
     ("precision", "適合率"),
     ("recall", "再現率"),
     ("f1", "F値"),
+    ("auc", "AUC"),
 ]
 
 SCORING = {
     "precision": "precision",
     "recall": "recall",
     "f1": "f1",
+    "accuracy": "accuracy",
+    "roc_auc": "roc_auc",
 }
+
+CLASS_LABELS_JA = {
+    1: "不具合発見する",
+    0: "不具合発見しない",
+}
+
+BASELINE_MODEL_NAME = "BL"
+BASELINE_DISPLAY_NAME = "ベースライン（常にバグ発見）"
+
+MODEL_SPECS: list[tuple[str, str, str]] = [
+    ("logistic", "ロジスティック回帰", "lr"),
+    ("tree", "決定木", "dt"),
+    ("rf", "ランダムフォレスト", "rf"),
+    ("gb", "勾配ブースティング", "gb"),
+]
+
+CONSOLE_MODEL_ORDER = [BASELINE_MODEL_NAME] + [name for _, name, _ in MODEL_SPECS]
 
 
 @dataclass(frozen=True)
@@ -116,16 +144,9 @@ TASK_CONFIGS: dict[str, TaskConfig] = {
     ),
 }
 
-BASELINE_MODEL_NAME = "BL"
-
-MODEL_SPECS: list[tuple[str, str, str]] = [
-    ("logistic", "ロジスティック回帰", "lr"),
-    ("tree", "決定木", "dt"),
-    ("rf", "ランダムフォレスト", "rf"),
-    ("gb", "勾配ブースティング", "gb"),
-]
-
 BOX_PLOT_MODEL_ORDER = [BASELINE_MODEL_NAME, "LR", "DT", "RF", "GB"]
+COMBINED_TABLE_DECIMALS = 2
+TASK_ORDER = ["task0", "task1", "task2"]
 IMPORTANCE_BOX_PLOT_MODEL_ORDER = ["DT", "RF", "GB"]
 IMPORTANCE_BOX_PLOT_FEATURE_ORDER = [
     "tree",
@@ -143,6 +164,108 @@ def _default_logs_root() -> Path:
 
 def _format_value(value: float, decimals: int = METRIC_DECIMALS) -> str:
     return format_latex_value(value, decimals)
+
+
+def _format_latex_metric(value: float | None, decimals: int = METRIC_DECIMALS) -> str:
+    """評価指標を LaTeX 表のセル用に整形する。NaN のときは --- を返す。"""
+    if value is None or np.isnan(value):
+        return "---"
+    return f"{value:.{decimals}f}"
+
+
+def format_latex_baseline_result(
+    metrics: dict,
+    *,
+    caption: str,
+    label: str,
+    decimals: int = METRIC_DECIMALS,
+) -> str:
+    """ベースラインの評価指標を LaTeX 表形式の文字列に整形する。"""
+    rows = [
+        ("適合率", metrics["precision"]),
+        ("再現率", metrics["recall"]),
+        ("F値", metrics["f1"]),
+        ("AUC", metrics.get("auc")),
+    ]
+    body_lines = []
+    for i, (name, value) in enumerate(rows):
+        suffix = r" \\ \hline" if i == len(rows) - 1 else r" \\"
+        body_lines.append(f"    {name} & {_format_latex_metric(value, decimals)}{suffix}")
+    body = "\n".join(body_lines)
+    return "\n".join([
+        r"\begin{table}[t]",
+        r"  \centering",
+        f"  \\caption{{{caption}}}",
+        f"  \\label{{{label}}}",
+        r"  \begin{tabular}{l|r} \hline",
+        r"    評価指標 & 値 \\ \hline \hline",
+        body,
+        r"  \end{tabular}",
+        r"\end{table}",
+    ])
+
+
+def format_latex_dataset_distribution(
+    y: pd.Series,
+    *,
+    caption: str,
+    label: str,
+) -> str:
+    """目的変数 y のクラス分布を LaTeX 表形式の文字列に整形する。"""
+    counts = y.value_counts()
+    n_positive = int(counts.get(1, 0))
+    n_negative = int(counts.get(0, 0))
+    return "\n".join([
+        r"\begin{table}[t]",
+        r"  \centering",
+        f"  \\caption{{{caption}}}",
+        f"  \\label{{{label}}}",
+        r"  \begin{tabular}{l|r} \hline",
+        r"    分類 & 数 \\ \hline \hline",
+        f"    {CLASS_LABELS_JA[1]} & {n_positive}\\\\",
+        f"    {CLASS_LABELS_JA[0]} & {n_negative}\\\\ \\hline",
+        r"  \end{tabular}",
+        r"\end{table}",
+    ])
+
+
+def format_latex_comparison_table(
+    results: list[tuple[str, dict]],
+    target_label: str,
+    *,
+    caption: str | None = None,
+    label: str | None = None,
+) -> str:
+    """アルゴリズム比較結果を LaTeX 表形式の文字列に整形する。"""
+    if caption is None:
+        caption = rf"アルゴリズム比較（目的: {target_label}）"
+    if label is None:
+        label = "tab:tree_different_model_comparison"
+
+    lines = [
+        r"\begin{table}[H]",
+        f"    \\caption{{{caption}}}",
+        f"    \\label{{{label}}}",
+        r"    \centering",
+        r"    \begin{tabular}{lrrrr}",
+        r"        \hline",
+        r"        アルゴリズム & 適合率 & 再現率 & F値 & AUC \\",
+        r"        \hline \hline",
+    ]
+    for name, metrics in results:
+        lines.append(
+            f"        {name} & "
+            f"{_format_latex_metric(metrics['precision'])} & "
+            f"{_format_latex_metric(metrics['recall'])} & "
+            f"{_format_latex_metric(metrics['f1'])} & "
+            f"{_format_latex_metric(metrics.get('auc'))} \\\\"
+        )
+    lines.extend([
+        r"        \hline",
+        r"    \end{tabular}",
+        r"\end{table}",
+    ])
+    return "\n".join(lines)
 
 
 def _transformed_feature_to_latex_term(feature_name: str) -> str:
@@ -392,23 +515,36 @@ def summarize_scores(scores: np.ndarray) -> dict[str, float]:
     }
 
 
+def _cv_test_scores(cv_results: dict, metric_key: str) -> np.ndarray:
+    cv_metric = "roc_auc" if metric_key == "auc" else metric_key
+    return cv_results[f"test_{cv_metric}"]
+
+
 def extract_fold_scores(cv_results: dict) -> dict[str, list[float]]:
     """各評価指標の fold 別スコアを辞書で返す。"""
-    return {
-        metric_key: [float(v) for v in cv_results[f"test_{metric_key}"]]
+    result = {
+        metric_key: [float(v) for v in _cv_test_scores(cv_results, metric_key)]
         for metric_key, _ in METRIC_ROWS
     }
+    result["accuracy"] = [float(v) for v in cv_results["test_accuracy"]]
+    return result
 
 
 def compute_baseline_fold_scores(X, y) -> dict[str, list[float]]:
     """常にバグ発見と予測するベースラインの fold 別スコアを返す。"""
     cv = StratifiedKFold(n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE)
     y_array = np.asarray(y)
-    fold_scores = {metric_key: [] for metric_key, _ in METRIC_ROWS}
+    fold_scores = {
+        metric_key: []
+        for metric_key, _ in METRIC_ROWS
+    }
+    fold_scores["accuracy"] = []
+    fold_scores["auc"] = []
 
     for _, test_idx in cv.split(X, y_array):
         y_test = y_array[test_idx]
         y_pred = np.ones(len(y_test), dtype=int)
+        y_proba = np.ones(len(y_test), dtype=float)
         fold_scores["precision"].append(
             float(precision_score(y_test, y_pred, zero_division=0))
         )
@@ -418,8 +554,38 @@ def compute_baseline_fold_scores(X, y) -> dict[str, list[float]]:
         fold_scores["f1"].append(
             float(f1_score(y_test, y_pred, zero_division=0))
         )
+        fold_scores["accuracy"].append(float(accuracy_score(y_test, y_pred)))
+        try:
+            fold_scores["auc"].append(float(roc_auc_score(y_test, y_proba)))
+        except ValueError:
+            fold_scores["auc"].append(float("nan"))
 
     return fold_scores
+
+
+def fold_scores_to_mean_metrics(fold_scores: dict[str, list[float]]) -> dict[str, float]:
+    """fold 別スコアから compare_models 形式の指標辞書（平均値）を生成する。"""
+    return {
+        metric_key: float(np.mean(scores))
+        for metric_key, scores in fold_scores.items()
+    }
+
+
+def build_console_results(
+    fold_scores_by_model: dict[str, dict[str, list[float]]],
+) -> list[tuple[str, dict[str, float]]]:
+    """コンソール比較表用の (モデル名, 平均指標) リストを返す。"""
+    display_names = {BASELINE_MODEL_NAME: BASELINE_DISPLAY_NAME}
+    results: list[tuple[str, dict[str, float]]] = []
+    for model_name in CONSOLE_MODEL_ORDER:
+        if model_name not in fold_scores_by_model:
+            continue
+        display_name = display_names.get(model_name, model_name)
+        results.append((
+            display_name,
+            fold_scores_to_mean_metrics(fold_scores_by_model[model_name]),
+        ))
+    return results
 
 
 def _to_box_plot_model_name(model_name: str) -> str:
@@ -438,8 +604,13 @@ def build_box_plot_fold_scores(
     fold_scores: dict[str, dict[str, list[float]]],
 ) -> dict[str, dict[str, list[float]]]:
     """plot_metrics_boxplot.py 用にモデル名を揃え、定義順に並べ替える。"""
+    metric_keys = {metric_key for metric_key, _ in METRIC_ROWS}
     renamed = {
-        _to_box_plot_model_name(model_name): scores
+        _to_box_plot_model_name(model_name): {
+            metric_key: scores[metric_key]
+            for metric_key in metric_keys
+            if metric_key in scores
+        }
         for model_name, scores in fold_scores.items()
     }
     return {
@@ -577,6 +748,87 @@ def format_latex_all_metrics_table(
     return "\n".join(lines)
 
 
+def _format_combined_table_value(value: float, decimals: int = COMBINED_TABLE_DECIMALS) -> str:
+    if value is None or np.isnan(value):
+        return "---"
+    return f"{value:.{decimals}f}"
+
+
+def _metric_stats_from_folds(scores: list[float]) -> tuple[float, float, float]:
+    arr = np.asarray(scores, dtype=float)
+    return float(np.mean(arr)), float(np.max(arr)), float(np.min(arr))
+
+
+def _normalize_fold_scores_for_combined_table(
+    fold_scores: dict[str, dict[str, list[float]]],
+) -> dict[str, dict[str, list[float]]]:
+    """全 task 横断表用に BL / LR / ... の短いモデル名へ揃える。"""
+    return {
+        _to_box_plot_model_name(model_name): scores
+        for model_name, scores in fold_scores.items()
+    }
+
+
+def format_latex_combined_all_tasks_metrics_table(
+    all_task_fold_scores: dict[str, dict[str, dict[str, list[float]]]],
+    *,
+    caption: str = r"各手法の評価結果（モデル構築プロセス）",
+    label: str = "tab:model_all_metrics",
+) -> str:
+    """task0/1/2 を横並びにした table* 形式の評価結果表（AUC 含む）を生成する。"""
+    n_metric_rows = len(METRIC_ROWS)
+    lines = [
+        r"\begin{table*}[t]",
+        r"  \centering",
+        r"  \small",
+        r"  \setlength{\tabcolsep}{2.5pt}",
+        f"  \\caption{{{caption}}}",
+        f"  \\label{{{label}}}",
+        r"  \begin{tabular}{@{}l|l|r|rrr|rrr|rrr|rrr@{}} \hline",
+        r"    & & BL & \multicolumn{3}{c|}{LR} & \multicolumn{3}{c|}{DT} & \multicolumn{3}{c|}{RF} & \multicolumn{3}{c}{GB} \\",
+        r"    シナリオ & 指標 & & 平均 & 最大 & 最小 & 平均 & 最大 & 最小 & 平均 & 最大 & 最小 & 平均 & 最大 & 最小 \\ \hline \hline",
+    ]
+
+    for task_idx, task_id in enumerate(TASK_ORDER):
+        if task_id not in all_task_fold_scores:
+            continue
+        config = TASK_CONFIGS[task_id]
+        scores_by_model = _normalize_fold_scores_for_combined_table(
+            all_task_fold_scores[task_id]
+        )
+
+        for row_idx, (metric_key, metric_label) in enumerate(METRIC_ROWS):
+            if row_idx == 0:
+                scenario_cell = rf"\multirow{{{n_metric_rows}}}{{*}}{{{config.dataset_macro}}}"
+            else:
+                scenario_cell = " "
+
+            row_parts = [scenario_cell, metric_label]
+
+            bl_mean, _, _ = _metric_stats_from_folds(scores_by_model["BL"][metric_key])
+            row_parts.append(_format_combined_table_value(bl_mean))
+
+            for model_name in BOX_PLOT_MODEL_ORDER[1:]:
+                mean, max_value, min_value = _metric_stats_from_folds(
+                    scores_by_model[model_name][metric_key]
+                )
+                row_parts.extend([
+                    _format_combined_table_value(mean),
+                    _format_combined_table_value(max_value),
+                    _format_combined_table_value(min_value),
+                ])
+
+            is_last_metric_row = row_idx == n_metric_rows - 1
+            suffix = r" \\ \hline" if is_last_metric_row else r" \\"
+            lines.append(f"    {' & '.join(row_parts)}{suffix}")
+
+    lines.extend([
+        r"  \end{tabular}",
+        r"\end{table*}",
+    ])
+    return "\n".join(lines)
+
+
 def build_logistic_latex(
     X,
     y,
@@ -596,6 +848,73 @@ def build_logistic_latex(
     )
 
 
+def _print_task_report(
+    config: TaskConfig,
+    y: pd.Series,
+    results: list[tuple[str, dict[str, float]]],
+    metrics_table: str,
+    importance_table: str,
+    logistic_latex: str,
+) -> None:
+    """1 task 分の評価結果を compare_models.py と同様に標準出力する。"""
+    baseline_metrics = results[0][1]
+
+    print("\n【LaTeX形式：ベースライン評価結果・データセット分布】")
+    print("-" * 88)
+    print(format_latex_baseline_result(
+        baseline_metrics,
+        caption=rf"ベースラインの評価結果 ({config.dataset_macro})",
+        label=f"tab:baseline_result_{config.task_id}",
+    ))
+    print()
+    print(format_latex_dataset_distribution(
+        y,
+        caption=rf"データセットの分布（{config.dataset_macro}）",
+        label=f"data_set_{config.task_id}",
+    ))
+
+    print("\n" + "=" * 88)
+    print(f"【アルゴリズム比較】適合率・再現率・F値・正解率・AUC（目的: {config.description}）")
+    print("=" * 88)
+    header = f"{'アルゴリズム':<24} {'適合率':>10} {'再現率':>10} {'F値':>10} {'正解率':>10} {'AUC':>10}"
+    print(header)
+    print("-" * 88)
+    for name, metrics in results:
+        auc_str = (
+            f"{metrics['auc']:>10.4f}"
+            if "auc" in metrics and not np.isnan(metrics["auc"])
+            else f"{'N/A':>10}"
+        )
+        row = (
+            f"{name:<24} "
+            f"{metrics['precision']:>10.4f} "
+            f"{metrics['recall']:>12.4f} "
+            f"{metrics['f1']:>14.4f} "
+            f"{metrics['accuracy']:>11.4f} "
+            f"{auc_str}"
+        )
+        print(row)
+    print("=" * 88)
+
+    print("\n【LaTeX形式の比較結果表】")
+    print("-" * 88)
+    print(format_latex_comparison_table(
+        results,
+        config.description,
+        label=f"tab:model_comparison_{config.task_id}",
+    ))
+
+    print("\n【LaTeX形式：各手法の評価結果】")
+    print("-" * 88)
+    print(metrics_table)
+    print("\n【LaTeX形式：各手法の特徴量重要度】")
+    print("-" * 88)
+    print(importance_table)
+    print("\n【LaTeX形式：ロジスティック回帰式】")
+    print("-" * 88)
+    print(logistic_latex)
+
+
 def evaluate_task(
     task_id: str,
     logs_root: Path,
@@ -606,6 +925,8 @@ def evaluate_task(
     str,
     dict[str, dict[str, list[float]]],
     dict[str, dict[str, list[float]]],
+    pd.Series,
+    list[tuple[str, dict[str, float]]],
 ]:
     config = TASK_CONFIGS[task_id]
     X, y = load_task_dataset(task_id, logs_root, verbose=verbose)
@@ -622,7 +943,7 @@ def evaluate_task(
         cv_results = run_cross_validation(X, y, pipeline)
 
         metrics = {
-            metric_key: summarize_scores(cv_results[f"test_{metric_key}"])
+            metric_key: summarize_scores(_cv_test_scores(cv_results, metric_key))
             for metric_key, _ in METRIC_ROWS
         }
         model_metrics.append((model_name, metrics))
@@ -652,7 +973,16 @@ def evaluate_task(
         label=config.importance_label,
     )
     logistic_latex = build_logistic_latex(X, y, config)
-    return metrics_table, importance_table, logistic_latex, fold_scores, fold_importances
+    console_results = build_console_results(fold_scores)
+    return (
+        metrics_table,
+        importance_table,
+        logistic_latex,
+        fold_scores,
+        fold_importances,
+        y,
+        console_results,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -695,6 +1025,7 @@ def main() -> None:
 
     all_fold_scores: dict[str, dict[str, dict[str, list[float]]]] = {}
     all_fold_importances: dict[str, dict[str, dict[str, list[float]]]] = {}
+    all_task_fold_scores: dict[str, dict[str, dict[str, list[float]]]] = {}
 
     for task_id in task_ids:
         config = TASK_CONFIGS[task_id]
@@ -708,23 +1039,26 @@ def main() -> None:
             logistic_latex,
             fold_scores,
             fold_importances,
+            y,
+            console_results,
         ) = evaluate_task(
             task_id,
             logs_root,
             verbose=args.verbose,
         )
+        print(f"データ件数: {len(y)} 件")
+        all_task_fold_scores[task_id] = fold_scores
         all_fold_scores[task_id] = build_box_plot_fold_scores(fold_scores)
         all_fold_importances[task_id] = build_box_plot_fold_importances(fold_importances)
 
-        print("\n【LaTeX形式：各手法の評価結果】")
-        print("-" * 88)
-        print(metrics_table)
-        print("\n【LaTeX形式：各手法の特徴量重要度】")
-        print("-" * 88)
-        print(importance_table)
-        print("\n【LaTeX形式：ロジスティック回帰式】")
-        print("-" * 88)
-        print(logistic_latex)
+        _print_task_report(
+            config,
+            y,
+            console_results,
+            metrics_table,
+            importance_table,
+            logistic_latex,
+        )
         print()
 
         if args.output_dir is not None:
@@ -737,6 +1071,20 @@ def main() -> None:
             print(f"保存しました: {metrics_path}")
             print(f"保存しました: {importance_path}")
             print(f"保存しました: {logistic_path}")
+            print()
+
+    if all(task_id in all_task_fold_scores for task_id in TASK_ORDER):
+        combined_table = format_latex_combined_all_tasks_metrics_table(all_task_fold_scores)
+        print("=" * 88)
+        print("【LaTeX形式：全シナリオ横断の評価結果表】")
+        print("=" * 88)
+        print(combined_table)
+        print()
+
+        if args.output_dir is not None:
+            combined_path = args.output_dir / "all_tasks_metrics.tex"
+            combined_path.write_text(combined_table + "\n", encoding="utf-8")
+            print(f"保存しました: {combined_path}")
             print()
 
     if all_fold_scores:
